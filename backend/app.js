@@ -1,0 +1,169 @@
+const express = require('express');
+const cors = require('cors');
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// === База данных ===
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: 'Asdffd1!',
+  database: 'shop'
+});
+
+// === Регистрация ===
+app.post('/auth/register', async (req, res) => {
+  const { name, email, password, contact, city, address } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "All fields required" });
+  }
+  const [users] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+  if (users.length > 0) {
+    return res.status(400).json({ error: "Email already exists" });
+  }
+  const hash = await bcrypt.hash(password, 10);
+  await pool.query(
+    'INSERT INTO users (name, email, password, contact, city, address) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, email, hash, contact, city, address]
+  );
+  res.json({ success: true, email, name });
+});
+
+// === Логин ===
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+  if (users.length === 0) {
+    return res.status(401).json({ error: "User not found" });
+  }
+  const user = users[0];
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) {
+    return res.status(401).json({ error: "Wrong password" });
+  }
+  res.json({ token: "dev-token", email: user.email, name: user.name });
+});
+
+// === Каталог товаров ===
+app.get('/products', async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM items');
+  res.json(rows);
+});
+
+// === Корзина (вывод) ===
+app.get('/cart', async (req, res) => {
+  const email = req.query.email;
+  if (!email) return res.status(400).json({ error: "Email required" });
+  const [rows] = await pool.query(
+    `SELECT cart_items.id, items.name, items.price, items.location 
+     FROM cart_items 
+     JOIN items ON cart_items.item_id = items.id 
+     WHERE cart_items.email = ? AND cart_items.status = "in_cart"`,
+    [email]
+  );
+  res.json(rows);
+});
+
+// === Добавить в корзину ===
+app.post('/cart', async (req, res) => {
+  const { item_id, email } = req.body;
+  if (!item_id || !email) return res.status(400).json({ error: "item_id and email required" });
+  const [users] = await pool.query('SELECT 1 FROM users WHERE email = ?', [email]);
+  if (users.length === 0) return res.status(403).json({ error: "User not found" });
+  await pool.query(
+    'INSERT INTO cart_items (email, item_id, status) VALUES (?, ?, "in_cart")',
+    [email, item_id]
+  );
+  res.json({ success: true });
+});
+
+// === Удалить из корзины ===
+app.delete('/cart/:id', async (req, res) => {
+  const id = req.params.id;
+  await pool.query('DELETE FROM cart_items WHERE id = ?', [id]);
+  res.json({ success: true });
+});
+
+// === Подтвердить 1 товар (опционально, если нужно поштучно) ===
+app.post('/cart/confirm', async (req, res) => {
+  const { item_id } = req.body;
+  await pool.query(
+    'UPDATE cart_items SET status = "ordered" WHERE id = ?',
+    [item_id]
+  );
+  res.json({ success: true });
+});
+
+// === Оформить ВЕСЬ заказ (рекомендуется) ===
+app.post('/order/confirm', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+
+  // 1. Получить товары в корзине пользователя
+  const [cartItems] = await pool.query(
+    `SELECT ci.item_id, i.price 
+     FROM cart_items ci 
+     JOIN items i ON ci.item_id = i.id 
+     WHERE ci.email = ? AND ci.status = "in_cart"`,
+    [email]
+  );
+  if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
+
+  // 2. Создать заказ
+  const [orderRes] = await pool.query(
+    'INSERT INTO orders (email) VALUES (?)', [email]
+  );
+  const orderId = orderRes.insertId;
+
+  // 3. Добавить позиции заказа
+  for (const item of cartItems) {
+    await pool.query(
+      'INSERT INTO order_items (order_id, item_id, price) VALUES (?, ?, ?)',
+      [orderId, item.item_id, item.price]
+    );
+  }
+
+  // 4. Обновить статус корзины
+  await pool.query(
+    'UPDATE cart_items SET status = "ordered" WHERE email = ? AND status = "in_cart"',
+    [email]
+  );
+
+  res.json({ success: true, orderId });
+});
+
+// Оформить все заказы одним запросом
+app.post('/order/confirm', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+
+  // Перевести все товары из корзины пользователя в статус "ordered"
+  await pool.query(
+    'UPDATE cart_items SET status = "ordered" WHERE email = ? AND status = "in_cart"',
+    [email]
+  );
+  res.json({ success: true });
+});
+
+// История заказов пользователя
+app.get('/orders', async (req, res) => {
+  const email = req.query.email;
+  if (!email) return res.status(400).json({ error: "Email required" });
+  const [rows] = await pool.query(
+    `SELECT items.name, items.price, items.location, cart_items.id, cart_items.status, cart_items.created_at
+     FROM cart_items 
+     JOIN items ON cart_items.item_id = items.id 
+     WHERE cart_items.email = ? AND cart_items.status = "ordered"
+     ORDER BY cart_items.created_at DESC`,
+    [email]
+  );
+  res.json(rows);
+});
+
+
+// === Запуск ===
+app.listen(5000, () => console.log('API listening on 5000'));
