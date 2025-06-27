@@ -4,7 +4,9 @@ const ADMIN_SECRET = "1234";
 
 const adminApi = {
   getProducts: () => api.get("/products"),
-  addProduct: (data) => api.post("/products/add", data),
+  addProduct: (data) => api.post("/products/add", data, {
+    headers: { "x-admin-secret": ADMIN_SECRET }
+  }),
   updateProduct: (id, data) => api.put(`/products/${id}`, data, {
     headers: { "x-admin-secret": ADMIN_SECRET }
   }),
