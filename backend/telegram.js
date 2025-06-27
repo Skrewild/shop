@@ -2,9 +2,9 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
 
-async function notifyAdminOrder({ email, user = {}, items, total, orderId }) {
+async function notifyAdminOrder({ email, user = {}, items, total, orderId, cancelled = false }) {
   const info = `
-🛒 Order!!!${orderId ? ` №${orderId}` : ""}!
+${cancelled ? '❌ ОТМЕНА заказа!' : '🛒 Новый заказ!'} ${orderId ? `№${orderId}` : ""}
 👤 Name: ${user.name || "—"}
 📧 Email: ${email}
 ☎️ Contact: ${user.contact || "—"}
