@@ -31,6 +31,8 @@ Available commands:
 /addproduct <name>; <price>; <products/file.jpg>
 /edit — edit a product
 /delete — delete a product
+/orders — view all confirmed orders
+/deleteorder <ID> — delete an order by its ID
 /help — show this help
 
 For /edit and /delete: the bot will show a list with IDs, then you send:
@@ -38,6 +40,7 @@ For /edit and /delete: the bot will show a list with IDs, then you send:
 /delete <ID>
   `.trim());
 });
+
 
 bot.onText(/^\/addproduct (.+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
