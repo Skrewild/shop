@@ -214,5 +214,22 @@ app.post('/orders/cancel', async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/products/add', async (req, res) => {
+  const { name, price, location } = req.body;
+  if (!name || !price || !location) {
+    return res.status(400).json({ error: "All fields required" });
+  }
+  // Дополнительная валидация цены
+  if (isNaN(Number(price)) || Number(price) <= 0) {
+    return res.status(400).json({ error: "Invalid price" });
+  }
+  await pool.query(
+    'INSERT INTO items (name, price, location) VALUES ($1, $2, $3)',
+    [name, price, location]
+  );
+  res.json({ success: true });
+});
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
