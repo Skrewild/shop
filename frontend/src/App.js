@@ -28,7 +28,7 @@ function App() {
             <Login setName={setName} setEmail={setEmail} />
           } />
           <Route path="/register" element={
-            <Register setName={setName} setEmail={setEmail} />   {/* ВОТ ТАК! */}
+            <Register setName={setName} setEmail={setEmail} />  
           } />
           <Route path="/products" element={
             <ProductList email={email} />
