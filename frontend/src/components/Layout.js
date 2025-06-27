@@ -3,6 +3,8 @@ import "../styles.css";
 import { Link } from "react-router-dom";
 
 export default function Layout({ children, isLoggedIn, name, email, onLogout }) {
+  const ADMIN_EMAIL = "admin@com";
+
   return (
     <div style={{
         backgroundImage: "url('/background.jpg')",
@@ -16,7 +18,7 @@ export default function Layout({ children, isLoggedIn, name, email, onLogout }) 
       <div className="overlay"></div>
       <header>
         <div className="logo">
-          <Link to="/"><img src="/logo.png" alt="logo" /></Link>
+          <Link to="/"><img src="build/logo.png" alt="logo" /></Link>
         </div>
         <nav>
           <ul>
@@ -28,7 +30,7 @@ export default function Layout({ children, isLoggedIn, name, email, onLogout }) 
                 <Link to="/cart">Cart</Link>
               </li>
             )}
-            {email === "admin@com" && (
+            {isLoggedIn && email === ADMIN_EMAIL && (
               <li>
                 <Link to="/admin">Admin Panel</Link>
               </li>
@@ -41,18 +43,9 @@ export default function Layout({ children, isLoggedIn, name, email, onLogout }) 
             ) : (
               <>
                 <li><Link to="/orders">Orders</Link></li>
-                <li>
-                  <button
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#ffd600",
-                      cursor: "pointer",
-                      fontSize: "1rem"
-                    }}
-                    onClick={onLogout}
-                  >Logout</button>
-                </li>
+                <li><button style={{
+                  background: "none", border: "none", color: "#ffd600", cursor: "pointer", fontSize: "1rem"
+                }} onClick={onLogout}>Logout</button></li>
               </>
             )}
           </ul>
