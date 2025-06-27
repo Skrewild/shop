@@ -7,6 +7,7 @@ import Register from "./components/Register";
 import ProductList from "./components/ProductList";
 import Cart from "./components/Cart";
 import Orders from "./components/Orders";
+import AdminPanel from "./components/AdminPanel";
 
 function App() {
   const [name, setName] = useState(localStorage.getItem("name"));
@@ -36,8 +37,9 @@ function App() {
           <Route
             path="/cart"
             element={email ? <Cart email={email} /> : <Navigate to="/login" />}
-          />
+          />>
           <Route path="/orders" element={<Orders email={email} />} />
+          <Route path="/admin" element={<AdminPanel />} /
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>
