@@ -254,6 +254,32 @@ app.put('/products/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/admin/orders', async (req, res) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  const q = `
+    SELECT ci.id, u.name, u.email, u.contact, u.city, u.address, i.name AS product_name, i.price, ci.created_at
+    FROM cart_items ci
+    JOIN users u ON ci.email = u.email
+    JOIN items i ON ci.item_id = i.id
+    WHERE ci.status = 'ordered'
+    ORDER BY ci.created_at DESC
+  `;
+  const { rows } = await pool.query(q);
+  res.json(rows);
+});
+
+app.delete('/admin/orders/:id', async (req, res) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  const { id } = req.params;
+  await pool.query('DELETE FROM cart_items WHERE id = $1 AND status = $2', [id, "ordered"]);
+  res.json({ success: true });
+});
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
