@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -7,13 +8,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// === База данных ===
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'Asdffd1!',
-  database: 'shop'
-});
+const pool = require('./db');
+app.listen(process.env.PORT || 5000, () => console.log('API listening on', process.env.PORT || 5000));
 
 // === Регистрация ===
 app.post('/auth/register', async (req, res) => {
