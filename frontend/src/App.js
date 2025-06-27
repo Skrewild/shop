@@ -13,11 +13,11 @@ function App() {
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
 
   const onLogout = () => {
-  localStorage.clear();         
-  window.location.href = '/'; 
-  setName(null);
-  setEmail && setEmail("");  
-};
+    localStorage.clear();
+    window.location.href = '/';
+    setName(null);
+    setEmail("");
+  };
 
   return (
     <Router>
@@ -28,7 +28,7 @@ function App() {
             <Login setName={setName} setEmail={setEmail} />
           } />
           <Route path="/register" element={
-            <Register setEmail={setEmail} />
+            <Register setName={setName} setEmail={setEmail} />   {/* ВОТ ТАК! */}
           } />
           <Route path="/products" element={
             <ProductList email={email} />
