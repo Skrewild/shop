@@ -16,26 +16,23 @@ export default function Layout({ children, isLoggedIn, name, email, onLogout }) 
       <div className="overlay"></div>
       <header>
         <div className="logo">
-          <Link to="/"><img src="build/logo.png" alt="logo" /></Link>
+          <Link to="/"><img src="/logo.png" alt="logo" /></Link>
         </div>
         <nav>
           <ul>
             <li>
               <Link to="/products">Catalog</Link>
             </li>
-            {/* Show Cart if logged in */}
             {isLoggedIn && (
               <li>
                 <Link to="/cart">Cart</Link>
               </li>
             )}
-            {/* Show Admin Panel link only for admin */}
-            {email === "admin@site.com" && (
+            {email === "admin@com" && (
               <li>
                 <Link to="/admin">Admin Panel</Link>
               </li>
             )}
-            {/* Login/Register vs Orders/Logout */}
             {!isLoggedIn ? (
               <>
                 <li><Link to="/login">Login</Link></li>
