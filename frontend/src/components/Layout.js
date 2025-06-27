@@ -16,7 +16,7 @@ export default function Layout({ children, isLoggedIn, name, onLogout }) {
       <div className="overlay"></div>
       <header>
         <div className="logo">
-          <Link to="/"><img src="/logo.png" alt="logo" /></Link>
+          <Link to="/"><img src="build/logo.png" alt="logo" /></Link>
         </div>
         <nav>
           <ul>
