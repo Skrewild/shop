@@ -13,20 +13,32 @@ export default function Register({ setName, setEmail }) {
   const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   const handleSubmit = async e => {
-    e.preventDefault();
-    setError('');
-    try {
-      const res = await api.post('/auth/register', form);
-      setName(res.data.name);
-      setEmail(res.data.email);
-      localStorage.setItem('name', res.data.name);
-      localStorage.setItem('email', res.data.email);
-      navigate("/products"); // Redirect прямо в каталог
-    } catch (err) {
-      console.log("API error:", err, err.response);
-      setError(err.response?.data?.error || JSON.stringify(err.response?.data) || err.message || "Registration failed!");
+  e.preventDefault();
+  setError('');
+  try {
+    const res = await api.post('/auth/register', form);
+    setName(res.data.name);
+    setEmail(res.data.email);
+    localStorage.setItem('name', res.data.name);
+    localStorage.setItem('email', res.data.email);
+    navigate("/products");
+  } catch (err) {
+    console.log("API error:", err, err.response);
+
+    let msg = "Registration failed!";
+    if (err.response && typeof err.response.data?.error === "string") {
+      msg = err.response.data.error;
+    } else if (err.response && typeof err.response.data === "string") {
+      msg = err.response.data;
+    } else if (err.response && err.response.data) {
+      msg = JSON.stringify(err.response.data);
+    } else if (err.message) {
+      msg = err.message;
     }
-  };
+    setError(msg);
+  }
+};
+
 
   return (
     <div className="auth-container">
