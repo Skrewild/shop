@@ -10,7 +10,6 @@ app.use(express.json());
 const pool = require('./models/db');
 const { notifyAdminOrder } = require('./telegram');
 
-
 app.post('/auth/register', async (req, res) => {
   const { name, email, password, contact, city, address } = req.body;
   if (!name || !email || !password) {
@@ -28,7 +27,6 @@ app.post('/auth/register', async (req, res) => {
   res.json({ success: true, email, name });
 });
 
-
 app.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
   const { rows: users } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -42,7 +40,6 @@ app.post('/auth/login', async (req, res) => {
   }
   res.json({ token: "dev-token", email: user.email, name: user.name });
 });
-
 
 app.get('/products', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM items');
@@ -119,13 +116,28 @@ app.post('/order/confirm', async (req, res) => {
     ["ordered", email, "in_cart"]
   );
 
-  notifyAdminOrder({
+  await notifyAdminOrder({
     email,
     items: cartItems,
-    total: cartItems.reduce((sum, item) => sum + Number(item.price), 0)
+    total: cartItems.reduce((sum, item) => sum + Number(item.price), 0),
+    orderId
   });
 
   res.json({ success: true, orderId });
+});
+
+app.get('/orders', async (req, res) => {
+  const email = req.query.email;
+  if (!email) return res.status(400).json({ error: "Email required" });
+  const { rows } = await pool.query(
+    `SELECT items.name, items.price, items.location, cart_items.id, cart_items.status, cart_items.created_at
+     FROM cart_items 
+     JOIN items ON cart_items.item_id = items.id 
+     WHERE cart_items.email = $1 AND cart_items.status = 'ordered'
+     ORDER BY cart_items.created_at DESC`,
+    [email]
+  );
+  res.json(rows);
 });
 
 const PORT = process.env.PORT || 5000;
