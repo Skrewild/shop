@@ -178,38 +178,41 @@ app.get('/orders', async (req, res) => {
 });
 
 app.post('/orders/cancel', async (req, res) => {
-  const { order_id, email } = req.body;
-  if (!order_id || !email) return res.status(400).json({ error: "Order ID and email required" });
+  const { id, email } = req.body;
+  if (!id || !email) return res.status(400).json({ error: "ID and email required" });
 
-  // Получить инфу о заказе (для уведомления)
-  const { rows: orderItems } = await pool.query(
-    `SELECT oi.id, i.name, oi.price
-     FROM order_items oi
-     JOIN items i ON oi.item_id = i.id
-     WHERE oi.order_id = $1`, [order_id]
+  const { rows: orderRows } = await pool.query(
+    `SELECT ci.item_id, i.name, i.price
+     FROM cart_items ci
+     JOIN items i ON ci.item_id = i.id
+     WHERE ci.id = $1 AND ci.email = $2 AND ci.status = 'ordered'`,
+    [id, email]
   );
-  if (!orderItems.length) return res.status(404).json({ error: "Order not found" });
+  if (!orderRows.length) return res.status(404).json({ error: "Order not found" });
 
-  await pool.query('UPDATE orders SET status = $1 WHERE id = $2 AND email = $3', ['cancelled', order_id, email]);
-
-  const { rows: users } = await pool.query(
+  const { rows: userRows } = await pool.query(
     'SELECT name, contact, city, address FROM users WHERE email = $1',
     [email]
   );
-  const user = users[0];
-  const { notifyAdminOrder } = require('./telegram');
+  const user = userRows[0];
+
+  // Помечаем заказ как cancelled
+  await pool.query(
+    'UPDATE cart_items SET status = $1 WHERE id = $2 AND email = $3',
+    ["cancelled", id, email]
+  );
+  
   await notifyAdminOrder({
     email,
     user,
-    items: orderItems,
-    total: orderItems.reduce((sum, item) => sum + Number(item.price), 0),
-    orderId: order_id,
+    items: orderRows,
+    total: orderRows.reduce((sum, item) => sum + Number(item.price), 0),
+    orderId: id,
     cancelled: true
   });
 
   res.json({ success: true });
 });
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
