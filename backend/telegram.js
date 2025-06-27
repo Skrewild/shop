@@ -8,10 +8,9 @@ const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const BACKEND_URL = process.env.BACKEND_URL || 'https://shop-kw6q.onrender.com';
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
-// --- Уведомление о заказах и отменах ---
 async function notifyAdminOrder({ email, user = {}, items, total, orderId, cancelled = false }) {
   const info = `
-${cancelled ? '❌ ОТМЕНА заказа!' : '🛒 Новый заказ!'} ${orderId ? `№${orderId}` : ""}
+${cancelled ? '❌ ORDER CANCELLED!' : '🛒 New order!'} ${orderId ? `№${orderId}` : ""}
 👤 Name: ${user.name || "—"}
 📧 Email: ${email}
 ☎️ Contact: ${user.contact || "—"}
@@ -19,63 +18,59 @@ ${cancelled ? '❌ ОТМЕНА заказа!' : '🛒 Новый заказ!'} 
 🏠 Address: ${user.address || "—"}
 
 ${items.map(i => `• ${i.name} — $${i.price}`).join('\n')}
-💵 Result: $${total}
+💵 Total: $${total}
   `.trim();
 
   await bot.sendMessage(ADMIN_CHAT_ID, info);
 }
 
-// --- HELP ---
 bot.onText(/^\/start|\/help/, (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   bot.sendMessage(msg.chat.id, `
-Доступные команды:
-/addproduct <название>; <цена>; <products/файл.jpg>
-/edit — редактировать товар
-/delete — удалить товар
-/help — подсказка
+Available commands:
+/addproduct <name>; <price>; <products/file.jpg>
+/edit — edit a product
+/delete — delete a product
+/help — show this help
 
-Для /edit и /delete: бот покажет список с ID, после чего ты отправляешь команду:
-/edit <ID>; <новое название>; <новая цена>; <products/файл.jpg>
+For /edit and /delete: the bot will show a list with IDs, then you send:
+/edit <ID>; <new name>; <new price>; <products/file.jpg>
 /delete <ID>
   `.trim());
 });
 
-// --- ДОБАВЛЕНИЕ ТОВАРА ---
 bot.onText(/^\/addproduct (.+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   const args = match[1].split(';').map(s => s.trim());
   if (args.length < 3) {
-    return bot.sendMessage(msg.chat.id, '⚠️ Формат: /addproduct Название; Цена; products/файл.jpg');
+    return bot.sendMessage(msg.chat.id, '⚠️ Format: /addproduct Name; Price; products/file.jpg');
   }
   const [name, price, location] = args;
   try {
     const res = await axios.post(`${BACKEND_URL}/products/add`, { name, price, location });
     if (res.data.success) {
-      bot.sendMessage(msg.chat.id, `✅ Товар "${name}" добавлен!`);
+      bot.sendMessage(msg.chat.id, `✅ Product "${name}" added!`);
     } else {
-      bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось добавить товар.'}`);
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Failed to add product.'}`);
     }
   } catch (err) {
-    bot.sendMessage(msg.chat.id, `❌ Ошибка при добавлении: ${err.response?.data?.error || err.message}`);
+    bot.sendMessage(msg.chat.id, `❌ Add error: ${err.response?.data?.error || err.message}`);
   }
 });
 
-// --- СПИСОК ДЛЯ РЕДАКТИРОВАНИЯ ---
 bot.onText(/^\/edit$/, async (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   try {
     const res = await axios.get(`${BACKEND_URL}/products`);
     if (!Array.isArray(res.data) || !res.data.length)
-      return bot.sendMessage(msg.chat.id, '❗️ Нет товаров для редактирования.');
-    const text = res.data.map(p => `ID: ${p.id}\nНазвание: ${p.name}\nЦена: $${p.price}\nКартинка: ${p.location}\n---`).join('\n');
-    bot.sendMessage(msg.chat.id, `Список товаров для редактирования:\n\n${text}\n\nТеперь отправь:\n/edit <ID>; <новое название>; <новая цена>; <products/файл.jpg>`);
+      return bot.sendMessage(msg.chat.id, '❗️ No products to edit.');
+    const text = res.data.map(p => `ID: ${p.id}\nName: ${p.name}\nPrice: $${p.price}\nImage: ${p.location}\n---`).join('\n');
+    bot.sendMessage(msg.chat.id, `Products for editing:\n\n${text}\n\nNow send:\n/edit <ID>; <new name>; <new price>; <products/file.jpg>`);
   } catch {
-    bot.sendMessage(msg.chat.id, '❌ Ошибка получения списка товаров.');
+    bot.sendMessage(msg.chat.id, '❌ Could not fetch products.');
   }
 });
 
-// --- РЕДАКТИРОВАТЬ ТОВАР ---
 bot.onText(/^\/edit (\d+);([^;]+);([^;]+);(.+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   const id = match[1].trim();
@@ -87,30 +82,28 @@ bot.onText(/^\/edit (\d+);([^;]+);([^;]+);(.+)/, async (msg, match) => {
       headers: { 'x-admin-secret': ADMIN_SECRET }
     });
     if (res.data.success) {
-      bot.sendMessage(msg.chat.id, `✏️ Товар ID ${id} успешно обновлён!`);
+      bot.sendMessage(msg.chat.id, `✏️ Product ID ${id} updated!`);
     } else {
-      bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось обновить.'}`);
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Update failed.'}`);
     }
   } catch (err) {
-    bot.sendMessage(msg.chat.id, `❌ Ошибка при обновлении:\n${err.response?.data?.error || err.message}`);
+    bot.sendMessage(msg.chat.id, `❌ Update error:\n${err.response?.data?.error || err.message}`);
   }
 });
 
-// --- СПИСОК ДЛЯ УДАЛЕНИЯ ---
 bot.onText(/^\/delete$/, async (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   try {
     const res = await axios.get(`${BACKEND_URL}/products`);
     if (!Array.isArray(res.data) || !res.data.length)
-      return bot.sendMessage(msg.chat.id, '❗️ Нет товаров для удаления.');
-    const text = res.data.map(p => `ID: ${p.id}\nНазвание: ${p.name}\nЦена: $${p.price}\nКартинка: ${p.location}\n---`).join('\n');
-    bot.sendMessage(msg.chat.id, `Список товаров для удаления:\n\n${text}\n\nТеперь отправь:\n/delete <ID>`);
+      return bot.sendMessage(msg.chat.id, '❗️ No products to delete.');
+    const text = res.data.map(p => `ID: ${p.id}\nName: ${p.name}\nPrice: $${p.price}\nImage: ${p.location}\n---`).join('\n');
+    bot.sendMessage(msg.chat.id, `Products for deletion:\n\n${text}\n\nNow send:\n/delete <ID>`);
   } catch {
-    bot.sendMessage(msg.chat.id, '❌ Ошибка получения списка товаров.');
+    bot.sendMessage(msg.chat.id, '❌ Could not fetch products.');
   }
 });
 
-// --- УДАЛИТЬ ТОВАР ---
 bot.onText(/^\/delete (\d+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   const id = match[1].trim();
@@ -119,12 +112,48 @@ bot.onText(/^\/delete (\d+)/, async (msg, match) => {
       headers: { 'x-admin-secret': ADMIN_SECRET }
     });
     if (res.data.success) {
-      bot.sendMessage(msg.chat.id, `🗑️ Товар ID ${id} успешно удалён!`);
+      bot.sendMessage(msg.chat.id, `🗑️ Product ID ${id} deleted!`);
     } else {
-      bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось удалить.'}`);
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Delete failed.'}`);
     }
   } catch (err) {
-    bot.sendMessage(msg.chat.id, `❌ Ошибка при удалении:\n${err.response?.data?.error || err.message}`);
+    bot.sendMessage(msg.chat.id, `❌ Delete error:\n${err.response?.data?.error || err.message}`);
+  }
+});
+
+bot.onText(/^\/orders$/, async (msg) => {
+  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
+  try {
+    const res = await axios.get(`${BACKEND_URL}/admin/orders`, {
+      headers: { 'x-admin-secret': ADMIN_SECRET }
+    });
+    if (!Array.isArray(res.data) || !res.data.length)
+      return bot.sendMessage(msg.chat.id, 'No confirmed orders.');
+    const text = res.data.map(o =>
+      `Order ID: ${o.id}\n` +
+      `User: ${o.name}\nEmail: ${o.email}\nContact: ${o.contact}\nCity: ${o.city}\nAddress: ${o.address}\n` +
+      `Product: ${o.item_name}\nPrice: $${o.price}\nTime: ${o.created_at?.slice(0,19).replace('T', ' ')}\n---`
+    ).join('\n');
+    bot.sendMessage(msg.chat.id, `Confirmed Orders:\n\n${text}\nTo delete: /deleteorder <ID>`);
+  } catch (err) {
+    bot.sendMessage(msg.chat.id, `❌ Could not fetch orders: ${err.response?.data?.error || err.message}`);
+  }
+});
+
+bot.onText(/^\/deleteorder (\d+)/, async (msg, match) => {
+  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
+  const id = match[1].trim();
+  try {
+    const res = await axios.delete(`${BACKEND_URL}/admin/orders/${id}`, {
+      headers: { 'x-admin-secret': ADMIN_SECRET }
+    });
+    if (res.data.success) {
+      bot.sendMessage(msg.chat.id, `🗑️ Order ID ${id} deleted!`);
+    } else {
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Delete failed.'}`);
+    }
+  } catch (err) {
+    bot.sendMessage(msg.chat.id, `❌ Delete error:\n${err.response?.data?.error || err.message}`);
   }
 });
 
