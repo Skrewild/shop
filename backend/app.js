@@ -71,6 +71,7 @@ app.post('/cart', async (req, res) => {
   res.json({ success: true });
 });
 
+// === Удалить из корзины ===
 app.delete('/cart/:id', async (req, res) => {
   const id = req.params.id;
   await pool.query('DELETE FROM cart_items WHERE id = $1', [id]);
@@ -80,6 +81,7 @@ app.delete('/cart/:id', async (req, res) => {
 app.post('/cart/confirm', async (req, res) => {
   const { item_id } = req.body;
 
+  // 1. Получить товар и email владельца
   const { rows } = await pool.query(
     `SELECT ci.email, i.name, i.price
      FROM cart_items ci
@@ -91,6 +93,12 @@ app.post('/cart/confirm', async (req, res) => {
 
   const { email, name, price } = rows[0];
 
+  const { rows: users } = await pool.query(
+    'SELECT name, contact, city, address FROM users WHERE email = $1',
+    [email]
+  );
+  const user = users[0];
+
   await pool.query(
     'UPDATE cart_items SET status = $1 WHERE id = $2',
     ["ordered", item_id]
@@ -98,6 +106,7 @@ app.post('/cart/confirm', async (req, res) => {
 
   await notifyAdminOrder({
     email,
+    user,
     items: [{ name, price }],
     total: Number(price),
     orderId: `single-item-${item_id}`
@@ -110,6 +119,13 @@ app.post('/order/confirm', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
 
+  // 1. Получить данные пользователя
+  const { rows: users } = await pool.query(
+    'SELECT name, contact, city, address FROM users WHERE email = $1',
+    [email]
+  );
+  const user = users[0];
+  
   const { rows: cartItems } = await pool.query(
     `SELECT ci.item_id, i.price, i.name 
      FROM cart_items ci 
@@ -138,6 +154,7 @@ app.post('/order/confirm', async (req, res) => {
 
   await notifyAdminOrder({
     email,
+    user,
     items: cartItems,
     total: cartItems.reduce((sum, item) => sum + Number(item.price), 0),
     orderId
@@ -146,6 +163,7 @@ app.post('/order/confirm', async (req, res) => {
   res.json({ success: true, orderId });
 });
 
+// === История заказов пользователя ===
 app.get('/orders', async (req, res) => {
   const email = req.query.email;
   if (!email) return res.status(400).json({ error: "Email required" });
