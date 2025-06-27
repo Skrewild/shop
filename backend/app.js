@@ -9,7 +9,8 @@ app.use(cors());
 app.use(express.json());
 
 const pool = require('./models/db');
-app.listen(process.env.PORT || 5000, () => console.log('API listening on', process.env.PORT || 5000));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log('API listening on ' + PORT));
 
 app.post('/auth/register', async (req, res) => {
   const { name, email, password, contact, city, address } = req.body;
