@@ -12,15 +12,13 @@ import AdminPanel from "./components/AdminPanel";
 function App() {
   const [name, setName] = useState(localStorage.getItem("name"));
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
-
+  const ADMIN_EMAIL = "admin@com";
   const onLogout = () => {
     localStorage.clear();
     window.location.href = '/';
     setName(null);
     setEmail("");
   };
-
-  const ADMIN_EMAIL = "admin@com";
 
   return (
     <Router>
@@ -37,7 +35,7 @@ function App() {
           <Route path="/orders" element={<Orders email={email} />} />
           <Route
             path="/admin"
-            element={email === ADMIN_EMAIL ? <AdminPanel email={email} /> : <Navigate to="/" />}
+            element={email === ADMIN_EMAIL ? <AdminPanel /> : <Navigate to="/" />}
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
