@@ -8,7 +8,6 @@ app.use(cors());
 app.use(express.json());
 
 const pool = require('./models/db');
-bot.sendMessage(process.env.TELEGRAM_CHAT_ID, '✅ Бот успешно запущен!').catch(console.error);
 const { notifyAdminOrder } = require('./telegram');
 
 app.post('/auth/register', async (req, res) => {
