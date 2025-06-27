@@ -5,7 +5,87 @@ const axios = require('axios');
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const BACKEND_URL = process.env.BACKEND_URL || 'https://shop-kw6q.onrender.com';
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+
+const mainMenu = {
+  reply_markup: {
+    keyboard: [
+      [{ text: "➕ Добавить товар" }, { text: "✏️ Изменить товар" }],
+      [{ text: "🗑️ Удалить товар" }]
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+  }
+};
+
+bot.onText(/^\/start/, (msg) => {
+  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) {
+    return bot.sendMessage(msg.chat.id, '⛔️ Доступно только админу!');
+  }
+  bot.sendMessage(msg.chat.id, "Добро пожаловать в меню управления товарами! Выберите действие:", mainMenu);
+});
+
+bot.on('message', async (msg) => {
+  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
+
+  // Добавить товар
+  if (msg.text === "➕ Добавить товар") {
+    return bot.sendMessage(msg.chat.id, 'Пришлите в формате: Название; Цена; products/файл.jpg\nПример: Крутые Кроссы; 59.99; products/shoes.jpg');
+  }
+
+  if (msg.text === "✏️ Изменить товар") {
+    return bot.sendMessage(msg.chat.id, 'Пришлите в формате: ID; Новое название; Новая цена; products/файл.jpg\nПример: 2; Куртка; 89.99; products/jacket.jpg');
+  }
+
+  if (msg.text === "🗑️ Удалить товар") {
+    return bot.sendMessage(msg.chat.id, 'Пришлите ID товара, который хотите удалить.');
+  }
+
+  if (/^[^;]+;\s*\d+(\.\d+)?;\s*products\/.+\.(jpg|png)$/i.test(msg.text)) {
+    const [name, price, location] = msg.text.split(';').map(s => s.trim());
+    try {
+      const res = await axios.post(`${BACKEND_URL}/products/add`, { name, price, location });
+      if (res.data.success) {
+        return bot.sendMessage(msg.chat.id, `✅ Товар "${name}" успешно добавлен!`);
+      } else {
+        return bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось добавить товар.'}`);
+      }
+    } catch (err) {
+      return bot.sendMessage(msg.chat.id, `❌ Ошибка при добавлении товара:\n${err.response?.data?.error || err.message}`);
+    }
+  }
+
+  if (/^\d+;\s*[^;]+;\s*\d+(\.\d+)?;\s*products\/.+\.(jpg|png)$/i.test(msg.text)) {
+    const [id, name, price, location] = msg.text.split(';').map(s => s.trim());
+    try {
+      const res = await axios.put(`${BACKEND_URL}/products/${id}`, { name, price, location }, {
+        headers: { 'x-admin-secret': process.env.ADMIN_SECRET }
+      });
+      if (res.data.success) {
+        return bot.sendMessage(msg.chat.id, `✏️ Товар #${id} успешно изменён.`);
+      } else {
+        return bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось изменить товар.'}`);
+      }
+    } catch (err) {
+      return bot.sendMessage(msg.chat.id, `❌ Ошибка при изменении товара:\n${err.response?.data?.error || err.message}`);
+    }
+  }
+
+  if (/^\d+$/.test(msg.text)) {
+    const id = msg.text.trim();
+    try {
+      const res = await axios.delete(`${BACKEND_URL}/products/${id}`, {
+        headers: { 'x-admin-secret': process.env.ADMIN_SECRET }
+      });
+      if (res.data.success) {
+        return bot.sendMessage(msg.chat.id, `🗑️ Товар #${id} успешно удалён.`);
+      } else {
+        return bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось удалить товар.'}`);
+      }
+    } catch (err) {
+      return bot.sendMessage(msg.chat.id, `❌ Ошибка при удалении товара:\n${err.response?.data?.error || err.message}`);
+    }
+  }
+});
 
 async function notifyAdminOrder({ email, user = {}, items, total, orderId, cancelled = false }) {
   const info = `
@@ -22,133 +102,5 @@ ${items.map(i => `• ${i.name} — $${i.price}`).join('\n')}
 
   await bot.sendMessage(process.env.TELEGRAM_CHAT_ID, info);
 }
-
-bot.onText(/^\/products$/, async (msg) => {
-  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
-
-  try {
-    const { data: items } = await axios.get(`${BACKEND_URL}/products`);
-    if (!items.length) return bot.sendMessage(msg.chat.id, '❌ Нет товаров в базе.');
-
-    const keyboard = items.map(item => ([{
-      text: `${item.name} ($${item.price})`,
-      callback_data: `product_${item.id}`
-    }]));
-    bot.sendMessage(msg.chat.id, 'Список товаров:', {
-      reply_markup: { inline_keyboard: keyboard }
-    });
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, 'Ошибка при получении товаров.');
-  }
-});
-
-bot.on('callback_query', async (query) => {
-  const { data, message } = query;
-  if (!data.startsWith('product_')) return;
-
-  const id = data.split('_')[1];
-  try {
-    const { data: items } = await axios.get(`${BACKEND_URL}/products`);
-    const item = items.find(i => String(i.id) === String(id));
-    if (!item) return bot.sendMessage(message.chat.id, "Товар не найден!");
-
-    const text = `Товар:\nID: ${item.id}\nНазвание: ${item.name}\nЦена: $${item.price}\nФото: ${item.location}`;
-    bot.sendMessage(message.chat.id, text, {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✏️ Редактировать", callback_data: `edit_${id}` },
-            { text: "🗑️ Удалить", callback_data: `delete_${id}` }
-          ]
-        ]
-      }
-    });
-  } catch {
-    bot.sendMessage(message.chat.id, "Ошибка при поиске товара.");
-  }
-});
-
-bot.on('callback_query', async (query) => {
-  const { data, message } = query;
-  if (!data.startsWith('delete_')) return;
-
-  const id = data.split('_')[1];
-  try {
-    const res = await axios.delete(`${BACKEND_URL}/products/${id}`, {
-      headers: { 'x-admin-secret': ADMIN_SECRET }
-    });
-    if (res.data.success) {
-      bot.sendMessage(message.chat.id, `✅ Товар удалён!`);
-    } else {
-      bot.sendMessage(message.chat.id, `Ошибка: ${res.data.error || "Не удалось удалить товар."}`);
-    }
-  } catch (e) {
-    bot.sendMessage(message.chat.id, "Ошибка удаления товара.");
-  }
-});
-
-const editState = {};
-bot.on('callback_query', (query) => {
-  const { data, message, from } = query;
-  if (!data.startsWith('edit_')) return;
-
-  const id = data.split('_')[1];
-  editState[from.id] = id;
-  bot.sendMessage(message.chat.id,
-    `Отправь новые данные для товара через ;\n\nНазвание; Цена; products/файл.jpg\n\nПример:\nКроссовки 2; 299.99; products/shoe2.jpg`
-  );
-});
-
-bot.on('message', async (msg) => {
-  if (!editState[msg.from.id]) return;
-  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
-
-  const id = editState[msg.from.id];
-  delete editState[msg.from.id];
-
-  const args = msg.text.split(';').map(s => s.trim());
-  if (args.length < 3) {
-    return bot.sendMessage(msg.chat.id, '⚠️ Формат: Название; Цена; products/файл.jpg');
-  }
-  const [name, price, location] = args;
-  try {
-    const res = await axios.put(`${BACKEND_URL}/products/${id}`, { name, price, location }, {
-      headers: { 'x-admin-secret': ADMIN_SECRET }
-    });
-    if (res.data.success) {
-      bot.sendMessage(msg.chat.id, `✅ Товар успешно обновлён!`);
-    } else {
-      bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось обновить.'}`);
-    }
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, `❌ Ошибка:\n${err.response?.data?.error || err.message}`);
-  }
-});
-
-bot.onText(/^\/addproduct (.+)/, async (msg, match) => {
-  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) {
-    return bot.sendMessage(msg.chat.id, '⛔️ Только админ может добавлять товары!');
-  }
-
-  const args = match[1].split(';').map(s => s.trim());
-  if (args.length < 3) {
-    return bot.sendMessage(msg.chat.id, '⚠️ Формат: /addproduct Название; Цена; products/файл.jpg');
-  }
-
-  const [name, price, location] = args;
-
-  try {
-    const res = await axios.post(`${BACKEND_URL}/products/add`, { name, price, location }, {
-      headers: { 'x-admin-secret': ADMIN_SECRET }
-    });
-    if (res.data.success) {
-      bot.sendMessage(msg.chat.id, `✅ Товар "${name}" успешно добавлен!`);
-    } else {
-      bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Не удалось добавить товар.'}`);
-    }
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, `❌ Ошибка при добавлении товара:\n${err.response?.data?.error || err.message}`);
-  }
-});
 
 module.exports = { notifyAdminOrder };
