@@ -9,6 +9,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'DELETE', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+app.options('*', cors());
 
 app.use(express.json());
 
@@ -76,7 +77,6 @@ app.post('/cart', async (req, res) => {
   res.json({ success: true });
 });
 
-// === Удалить из корзины ===
 app.delete('/cart/:id', async (req, res) => {
   const id = req.params.id;
   await pool.query('DELETE FROM cart_items WHERE id = $1', [id]);
@@ -85,8 +85,6 @@ app.delete('/cart/:id', async (req, res) => {
 
 app.post('/cart/confirm', async (req, res) => {
   const { item_id } = req.body;
-
-  // 1. Получить товар и email владельца
   const { rows } = await pool.query(
     `SELECT ci.email, i.name, i.price
      FROM cart_items ci
@@ -97,7 +95,6 @@ app.post('/cart/confirm', async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: "Item not found" });
 
   const { email, name, price } = rows[0];
-
   const { rows: users } = await pool.query(
     'SELECT name, contact, city, address FROM users WHERE email = $1',
     [email]
@@ -124,7 +121,6 @@ app.post('/order/confirm', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
 
-  // 1. Получить данные пользователя
   const { rows: users } = await pool.query(
     'SELECT name, contact, city, address FROM users WHERE email = $1',
     [email]
@@ -201,12 +197,11 @@ app.post('/orders/cancel', async (req, res) => {
   );
   const user = userRows[0];
 
-  // Помечаем заказ как cancelled
   await pool.query(
     'UPDATE cart_items SET status = $1 WHERE id = $2 AND email = $3',
     ["cancelled", id, email]
   );
-  
+
   await notifyAdminOrder({
     email,
     user,
