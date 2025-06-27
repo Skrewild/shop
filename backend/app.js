@@ -163,7 +163,6 @@ app.post('/order/confirm', async (req, res) => {
   res.json({ success: true, orderId });
 });
 
-// === История заказов пользователя ===
 app.get('/orders', async (req, res) => {
   const email = req.query.email;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -177,6 +176,40 @@ app.get('/orders', async (req, res) => {
   );
   res.json(rows);
 });
+
+app.post('/orders/cancel', async (req, res) => {
+  const { order_id, email } = req.body;
+  if (!order_id || !email) return res.status(400).json({ error: "Order ID and email required" });
+
+  // Получить инфу о заказе (для уведомления)
+  const { rows: orderItems } = await pool.query(
+    `SELECT oi.id, i.name, oi.price
+     FROM order_items oi
+     JOIN items i ON oi.item_id = i.id
+     WHERE oi.order_id = $1`, [order_id]
+  );
+  if (!orderItems.length) return res.status(404).json({ error: "Order not found" });
+
+  await pool.query('UPDATE orders SET status = $1 WHERE id = $2 AND email = $3', ['cancelled', order_id, email]);
+
+  const { rows: users } = await pool.query(
+    'SELECT name, contact, city, address FROM users WHERE email = $1',
+    [email]
+  );
+  const user = users[0];
+  const { notifyAdminOrder } = require('./telegram');
+  await notifyAdminOrder({
+    email,
+    user,
+    items: orderItems,
+    total: orderItems.reduce((sum, item) => sum + Number(item.price), 0),
+    orderId: order_id,
+    cancelled: true
+  });
+
+  res.json({ success: true });
+});
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
