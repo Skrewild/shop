@@ -3,7 +3,6 @@ import "../styles.css";
 import { Link } from "react-router-dom";
 
 export default function Layout({ children, isLoggedIn, name, email, onLogout }) {
-  const ADMIN_EMAIL = "admin@com";
 
   return (
     <div style={{
@@ -18,7 +17,7 @@ export default function Layout({ children, isLoggedIn, name, email, onLogout }) 
       <div className="overlay"></div>
       <header>
         <div className="logo">
-          <Link to="/"><img src="build/logo.png" alt="logo" /></Link>
+          <Link to="/"><img src="/logo.png" alt="logo" /></Link>
         </div>
         <nav>
           <ul>
@@ -28,11 +27,6 @@ export default function Layout({ children, isLoggedIn, name, email, onLogout }) 
             {isLoggedIn && (
               <li>
                 <Link to="/cart">Cart</Link>
-              </li>
-            )}
-            {isLoggedIn && email === ADMIN_EMAIL && (
-              <li>
-                <Link to="/admin">Admin Panel</Link>
               </li>
             )}
             {!isLoggedIn ? (
