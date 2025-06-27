@@ -219,13 +219,37 @@ app.post('/products/add', async (req, res) => {
   if (!name || !price || !location) {
     return res.status(400).json({ error: "All fields required" });
   }
-  // Дополнительная валидация цены
   if (isNaN(Number(price)) || Number(price) <= 0) {
     return res.status(400).json({ error: "Invalid price" });
   }
   await pool.query(
     'INSERT INTO items (name, price, location) VALUES ($1, $2, $3)',
     [name, price, location]
+  );
+  res.json({ success: true });
+});
+
+app.delete('/products/:id', async (req, res) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  const { id } = req.params;
+  await pool.query('DELETE FROM items WHERE id = $1', [id]);
+  res.json({ success: true });
+});
+
+app.put('/products/:id', async (req, res) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  const { id } = req.params;
+  const { name, price, location } = req.body;
+  if (!name || !price || !location) {
+    return res.status(400).json({ error: "All fields required" });
+  }
+  await pool.query(
+    'UPDATE items SET name = $1, price = $2, location = $3 WHERE id = $4',
+    [name, price, location, id]
   );
   res.json({ success: true });
 });
