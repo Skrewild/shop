@@ -79,10 +79,30 @@ app.delete('/cart/:id', async (req, res) => {
 
 app.post('/cart/confirm', async (req, res) => {
   const { item_id } = req.body;
+
+  const { rows } = await pool.query(
+    `SELECT ci.email, i.name, i.price
+     FROM cart_items ci
+     JOIN items i ON ci.item_id = i.id
+     WHERE ci.id = $1`,
+    [item_id]
+  );
+  if (!rows.length) return res.status(404).json({ error: "Item not found" });
+
+  const { email, name, price } = rows[0];
+
   await pool.query(
     'UPDATE cart_items SET status = $1 WHERE id = $2',
     ["ordered", item_id]
   );
+
+  await notifyAdminOrder({
+    email,
+    items: [{ name, price }],
+    total: Number(price),
+    orderId: `single-item-${item_id}`
+  });
+
   res.json({ success: true });
 });
 
