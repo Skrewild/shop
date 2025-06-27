@@ -8,7 +8,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = require('./db');
+const pool = require('./models/db');
 app.listen(process.env.PORT || 5000, () => console.log('API listening on', process.env.PORT || 5000));
 
 app.post('/auth/register', async (req, res) => {
