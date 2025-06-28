@@ -60,6 +60,7 @@ app.get('/products', async (req, res) => {
 app.get('/cart', async (req, res) => {
   const email = req.query.email;
   if (!email) return res.status(400).json({ error: "Email required" });
+
   const { rows } = await pool.query(
     `SELECT cart_items.id, items.name, items.price, items.location 
      FROM cart_items 
@@ -67,8 +68,16 @@ app.get('/cart', async (req, res) => {
      WHERE cart_items.email = $1 AND cart_items.status = 'in_cart'`,
     [email]
   );
-  res.json(rows);
+
+  const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+  const updatedRows = rows.map(row => ({
+    ...row,
+    imageUrl: `${baseUrl}/${row.location}`
+  }));
+
+  res.json(updatedRows);
 });
+
 
 app.post('/cart', async (req, res) => {
   const { item_id, email } = req.body;
