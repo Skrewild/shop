@@ -44,7 +44,7 @@ export default function ProductList({ email }) {
             <img
               src={
                 product.location
-                  ? `/products/${product.location.replace(/^products\//, "").replace(/^\/+/, "")}`
+                  ? `https://shop-kw6q.onrender.com/${product.location.trim()}`
                   : "/default-product.jpg"
               }
               alt={product.name}
@@ -53,6 +53,7 @@ export default function ProductList({ email }) {
                 e.target.src = "/default-product.jpg";
               }}
             />
+
             <h3>{product.name}</h3>
             <div className="price">${product.price}</div>
             <button
