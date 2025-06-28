@@ -62,21 +62,16 @@ app.get('/cart', async (req, res) => {
   if (!email) return res.status(400).json({ error: "Email required" });
 
   const { rows } = await pool.query(
-    `SELECT cart_items.id, items.name, items.price, items.location 
+    `SELECT cart_items.id, items.name, items.price
      FROM cart_items 
      JOIN items ON cart_items.item_id = items.id 
      WHERE cart_items.email = $1 AND cart_items.status = 'in_cart'`,
     [email]
   );
 
-  const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-  const updatedRows = rows.map(row => ({
-    ...row,
-    imageUrl: `${baseUrl}/${row.location}`
-  }));
-
-  res.json(updatedRows);
+  res.json(rows);
 });
+
 
 
 app.post('/cart', async (req, res) => {
@@ -182,16 +177,19 @@ app.post('/order/confirm', async (req, res) => {
 app.get('/orders', async (req, res) => {
   const email = req.query.email;
   if (!email) return res.status(400).json({ error: "Email required" });
+
   const { rows } = await pool.query(
-    `SELECT items.name, items.price, items.location, cart_items.id, cart_items.status, cart_items.created_at
+    `SELECT items.name, items.price, cart_items.id, cart_items.status, cart_items.created_at
      FROM cart_items 
      JOIN items ON cart_items.item_id = items.id 
      WHERE cart_items.email = $1 AND cart_items.status = 'ordered'
      ORDER BY cart_items.created_at DESC`,
     [email]
   );
+
   res.json(rows);
 });
+
 
 app.post('/orders/cancel', async (req, res) => {
   const { id, email } = req.body;
