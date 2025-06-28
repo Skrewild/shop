@@ -124,11 +124,6 @@ app.post('/cart/confirm', async (req, res) => {
     [name]
   );
 
-  await pool.query(
-    'UPDATE cart_items SET status = $1 WHERE id = $2',
-    ["ordered", item_id]
-  );
-
   await notifyAdminOrder({
     email,
     user,
@@ -177,10 +172,6 @@ app.post('/order/confirm', async (req, res) => {
     await pool.query(
       'INSERT INTO order_items (order_id, item_id, price, quantity) VALUES ($1, $2, $3, $4)',
       [orderId, item.item_id, item.price, item.quantity]
-    );
-    await pool.query(
-      'UPDATE items SET stock = stock - $1 WHERE id = $2',
-      [item.quantity, item.item_id]
     );
   }
 
