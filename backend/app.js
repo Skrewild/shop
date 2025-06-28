@@ -185,9 +185,10 @@ app.post('/order/confirm', async (req, res) => {
   }
 
   await pool.query(
-    'UPDATE cart_items SET status = $1 WHERE email = $2 AND status = $3',
-    ["ordered", email, "in_cart"]
+  'UPDATE cart_items SET status = $1 WHERE email = $2 AND status = $3',
+  ["waiting", email, "in_cart"]
   );
+
 
   await notifyAdminOrder({
     email,
@@ -367,6 +368,50 @@ app.get('/orders/export', async (req, res) => {
   await workbook.xlsx.write(res);
   res.end();
 });
+
+app.get('/admin/orders/waiting', async (req, res) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  const q = `
+    SELECT ci.id, u.name, u.email, u.contact, u.city, u.address, i.name AS product_name, i.price, ci.created_at
+    FROM cart_items ci
+    JOIN users u ON ci.email = u.email
+    JOIN items i ON ci.item_id = i.id
+    WHERE ci.status = 'waiting'
+    ORDER BY ci.created_at DESC
+  `;
+  const { rows } = await pool.query(q);
+  res.json(rows);
+});
+
+app.post('/admin/orders/confirm/:id', async (req, res) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  const id = req.params.id;
+
+  const { rows } = await pool.query(
+    `SELECT ci.item_id, i.stock
+     FROM cart_items ci
+     JOIN items i ON ci.item_id = i.id
+     WHERE ci.id = $1 AND ci.status = 'waiting'`,
+    [id]
+  );
+  if (!rows.length) return res.status(404).json({ error: "Order not found or already confirmed" });
+
+  const { item_id, stock } = rows[0];
+  if (stock <= 0) {
+    return res.status(400).json({ error: "Not enough stock" });
+  }
+
+  await pool.query('UPDATE items SET stock = stock - 1 WHERE id = $1', [item_id]);
+
+  await pool.query('UPDATE cart_items SET status = $1 WHERE id = $2', ["ordered", id]);
+
+  res.json({ success: true });
+});
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
