@@ -53,7 +53,7 @@ app.post('/auth/login', async (req, res) => {
 });
 
 app.get('/products', async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name, price, location FROM items');
+  const { rows } = await pool.query('SELECT id, name, price, location FROM items WHERE is_deleted = false');
   res.json(rows);
 });
 
@@ -241,7 +241,7 @@ app.delete('/products/:id', async (req, res) => {
     return res.status(403).json({ error: "Not authorized" });
   }
   const { id } = req.params;
-  await pool.query('DELETE FROM items WHERE id = $1', [id]);
+  await pool.query('UPDATE items SET is_deleted = true WHERE id = $1', [id]);
   res.json({ success: true });
 });
 
