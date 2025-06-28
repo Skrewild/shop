@@ -10,20 +10,25 @@ export default function Orders({ email }) {
   useEffect(() => {
     if (!email) return;
     setLoading(true);
-    api.get("/orders", { params: { email } })
-      .then(res => { setOrders(res.data); setLoading(false); })
-      .catch(() => { setMsg("Failed to load orders."); setLoading(false); });
+    api
+      .get("/orders", { params: { email } })
+      .then((res) => {
+        setOrders(res.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setMsg("Failed to load orders.");
+        setLoading(false);
+      });
   }, [email]);
 
   const cancelOrder = async (orderId) => {
     try {
       await api.post("/orders/cancel", { id: orderId, email });
-      setOrders((prev) =>
-        prev.filter((order) => order.id !== orderId)
-      );
+      setOrders((prev) => prev.filter((order) => order.id !== orderId));
       setMsg("Order cancelled!");
       setTimeout(() => setMsg(""), 2000);
-    } catch (e) {
+    } catch {
       setMsg("Failed to cancel order.");
       setTimeout(() => setMsg(""), 2000);
     }
@@ -36,12 +41,20 @@ export default function Orders({ email }) {
     <div className="order-history-container">
       <h2>Your Order History</h2>
       {msg && <div className="cart-msg">{msg}</div>}
-      {orders.map(order => (
+      {orders.map((order) => (
         <div className="order-item" key={order.id}>
           <img
             className="cart-item-img"
-            src={order.location ? `/products/${order.location.replace(/^products\//, "")}` : "/default-product.jpg"}
+            src={
+              order.location
+                ? `/products/${order.location.replace(/^products\//, "").replace(/^\/+/, "")}`
+                : "/default-product.jpg"
+            }
             alt={order.name}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "/default-product.jpg";
+            }}
           />
           <div className="cart-item-details">
             <h3>{order.name}</h3>
