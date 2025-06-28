@@ -119,7 +119,6 @@ app.post('/cart/confirm', async (req, res) => {
   );
   const user = users[0];
 
-  // ВАЖНО: уменьшить stock именно тут!
   await pool.query(
     'UPDATE items SET stock = stock - 1 WHERE name = $1 AND stock > 0',
     [name]
@@ -153,18 +152,19 @@ app.post('/order/confirm', async (req, res) => {
   const user = users[0];
 
   const { rows: cartItems } = await pool.query(
-    `SELECT ci.item_id, i.price, i.name, i.location, i.stock
-     FROM cart_items ci 
-     JOIN items i ON ci.item_id = i.id 
-     WHERE ci.email = $1 AND ci.status = 'in_cart'`,
+    `SELECT ci.item_id, i.price, i.name, i.location, i.stock, COUNT(*) AS quantity
+     FROM cart_items ci
+     JOIN items i ON ci.item_id = i.id
+     WHERE ci.email = $1 AND ci.status = 'in_cart'
+     GROUP BY ci.item_id, i.price, i.name, i.location, i.stock`,
     [email]
   );
 
   if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
-  
+
   for (const item of cartItems) {
-    if (item.stock <= 0) {
-      return res.status(400).json({ error: `Товара "${item.name}" нет в наличии` });
+    if (item.stock < item.quantity) {
+      return res.status(400).json({ error: `Not enough stock for "${item.name}". Requested: ${item.quantity}, in stock: ${item.stock}` });
     }
   }
 
@@ -172,16 +172,15 @@ app.post('/order/confirm', async (req, res) => {
     'INSERT INTO orders (email) VALUES ($1) RETURNING id', [email]
   );
   const orderId = orderRes.rows[0].id;
-
+  
   for (const item of cartItems) {
     await pool.query(
-      'INSERT INTO order_items (order_id, item_id, price) VALUES ($1, $2, $3)',
-      [orderId, item.item_id, item.price]
+      'INSERT INTO order_items (order_id, item_id, price, quantity) VALUES ($1, $2, $3, $4)',
+      [orderId, item.item_id, item.price, item.quantity]
     );
-    
     await pool.query(
-      'UPDATE items SET stock = stock - 1 WHERE id = $1 AND stock > 0',
-      [item.item_id]
+      'UPDATE items SET stock = stock - $1 WHERE id = $2',
+      [item.quantity, item.item_id]
     );
   }
 
@@ -194,7 +193,7 @@ app.post('/order/confirm', async (req, res) => {
     email,
     user,
     items: cartItems,
-    total: cartItems.reduce((sum, item) => sum + Number(item.price), 0),
+    total: cartItems.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0),
     orderId
   });
 
