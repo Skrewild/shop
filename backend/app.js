@@ -7,9 +7,6 @@ const fileUpload = require('express-fileupload');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-app.use(fileUpload());
-app.use('/products', express.static(path.join(__dirname, 'products')));
-
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'DELETE', 'PUT', 'OPTIONS'],
@@ -18,6 +15,8 @@ app.use(cors({
 app.options('*', cors());
 
 app.use(express.json());
+app.use(fileUpload());
+app.use('/products', express.static(path.join(__dirname, 'products')));
 
 const pool = require('./models/db');
 const { notifyAdminOrder } = require('./telegram');
