@@ -101,26 +101,6 @@ Example: (photo) T-Shirt; 2990"
   `.trim());
 });
 
-
-bot.onText(/^\/addproduct (.+)/, async (msg, match) => {
-  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
-  const args = match[1].split(';').map(s => s.trim());
-  if (args.length < 3) {
-    return bot.sendMessage(msg.chat.id, '⚠️ Format: /addproduct Name; Price; products/file.jpg');
-  }
-  const [name, price, location] = args;
-  try {
-    const res = await axios.post(${BACKEND_URL}/products/add, { name, price, location });
-    if (res.data.success) {
-      bot.sendMessage(msg.chat.id, ✅ Product "${name}" added!);
-    } else {
-      bot.sendMessage(msg.chat.id, ⚠️ Error: ${res.data.error || 'Failed to add product.'});
-    }
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, ❌ Add error: ${err.response?.data?.error || err.message});
-  }
-});
-
 bot.onText(/^\/edit$/, async (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   try {
