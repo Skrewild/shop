@@ -227,4 +227,41 @@ bot.onText(/^\/deleteorder (\d+)/, async (msg, match) => {
   }
 });
 
+bot.onText(/^\/waiting$/, async (msg) => {
+  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
+  try {
+    const res = await axios.get(`${BACKEND_URL}/admin/orders/waiting`, {
+      headers: { 'x-admin-secret': ADMIN_SECRET }
+    });
+    if (!Array.isArray(res.data) || !res.data.length)
+      return bot.sendMessage(msg.chat.id, 'Нет ожидающих подтверждения заказов.');
+    const text = res.data.map(o =>
+      `Order ID: ${o.id}\n` +
+      `User: ${o.name}\nEmail: ${o.email}\nContact: ${o.contact}\nCity: ${o.city}\nAddress: ${o.address}\n` +
+      `Product: ${o.product_name}\nPrice: $${o.price}\nTime: ${o.created_at?.slice(0,19).replace('T', ' ')}\n---`
+    ).join('\n');
+    bot.sendMessage(msg.chat.id, `Ожидающие подтверждения заказы:\n\n${text}\nЧтобы подтвердить: /approve <ID>`);
+  } catch (err) {
+    bot.sendMessage(msg.chat.id, `❌ Не удалось получить заказы: ${err.response?.data?.error || err.message}`);
+  }
+});
+
+bot.onText(/^\/approve (\d+)/, async (msg, match) => {
+  if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
+  const id = match[1].trim();
+  try {
+    const res = await axios.post(`${BACKEND_URL}/admin/orders/confirm/${id}`, {}, {
+      headers: { 'x-admin-secret': ADMIN_SECRET }
+    });
+    if (res.data.success) {
+      bot.sendMessage(msg.chat.id, `✅ Заказ ID ${id} подтверждён!`);
+    } else {
+      bot.sendMessage(msg.chat.id, `⚠️ Ошибка: ${res.data.error || 'Подтверждение не удалось.'}`);
+    }
+  } catch (err) {
+    bot.sendMessage(msg.chat.id, `❌ Ошибка подтверждения:\n${err.response?.data?.error || err.message}`);
+  }
+});
+
+
 module.exports = { notifyAdminOrder };
