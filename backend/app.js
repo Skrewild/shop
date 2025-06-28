@@ -3,6 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const app = express();
+const fileUpload = require('express-fileupload');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+
+app.use(fileUpload());
+app.use('/products', express.static(path.join(__dirname, 'products')));
 
 app.use(cors({
   origin: '*',
@@ -279,6 +285,23 @@ app.delete('/admin/orders/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/upload', async (req, res) => {
+  if (!req.files || !req.files.image) {
+    return res.status(400).json({ error: "No image file provided" });
+  }
+
+  const image = req.files.image;
+  const ext = path.extname(image.name);
+  const filename = uuidv4() + ext;
+  const filepath = path.join(__dirname, 'products', filename);
+
+  try {
+    await image.mv(filepath);
+    res.json({ success: true, location: `products/${filename}` });
+  } catch (err) {
+    res.status(500).json({ error: "Upload failed", detail: err.message });
+  }
+});
 
 
 const PORT = process.env.PORT || 5000;
