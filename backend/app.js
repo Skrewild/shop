@@ -119,9 +119,10 @@ app.post('/cart/confirm', async (req, res) => {
   );
   const user = users[0];
 
+  // Меняем статус этой позиции на "waiting"
   await pool.query(
-    'UPDATE items SET stock = stock - 1 WHERE name = $1 AND stock > 0',
-    [name]
+    'UPDATE cart_items SET status = $1 WHERE id = $2',
+    ["waiting", item_id]
   );
 
   await notifyAdminOrder({
@@ -134,6 +135,7 @@ app.post('/cart/confirm', async (req, res) => {
 
   res.json({ success: true });
 });
+
 
 
 app.post('/order/confirm', async (req, res) => {
