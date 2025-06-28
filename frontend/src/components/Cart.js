@@ -59,19 +59,6 @@ export default function Cart({ email }) {
       <div className="cart-list">
         {cart.map((item) => (
           <div className="cart-item" key={item.id}>
-            <img
-              className="cart-item-img"
-              src={
-                item.location
-                  ? `/products/${item.location.replace(/^products\//, "").replace(/^\/+/, "")}`
-                  : "/default-product.jpg"
-              }
-              alt={item.name}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "/default-product.jpg";
-              }}
-            />
             <div className="cart-item-details">
               <h3>{item.name}</h3>
               <div className="price">${item.price}</div>
