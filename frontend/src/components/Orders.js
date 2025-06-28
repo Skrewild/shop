@@ -43,19 +43,6 @@ export default function Orders({ email }) {
       {msg && <div className="cart-msg">{msg}</div>}
       {orders.map((order) => (
         <div className="order-item" key={order.id}>
-          <img
-            className="cart-item-img"
-            src={
-              order.location
-                ? `/products/${order.location.replace(/^products\//, "").replace(/^\/+/, "")}`
-                : "/default-product.jpg"
-            }
-            alt={order.name}
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = "/default-product.jpg";
-            }}
-          />
           <div className="cart-item-details">
             <h3>{order.name}</h3>
             <div className="price">${order.price}</div>
