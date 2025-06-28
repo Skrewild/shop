@@ -133,12 +133,13 @@ app.post('/order/confirm', async (req, res) => {
   const user = users[0];
   
   const { rows: cartItems } = await pool.query(
-    `SELECT ci.item_id, i.price, i.name 
+    `SELECT ci.item_id, i.price, i.name, i.location 
      FROM cart_items ci 
      JOIN items i ON ci.item_id = i.id 
      WHERE ci.email = $1 AND ci.status = 'in_cart'`,
     [email]
   );
+
   if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
 
   const orderRes = await pool.query(
@@ -188,12 +189,13 @@ app.post('/orders/cancel', async (req, res) => {
   if (!id || !email) return res.status(400).json({ error: "ID and email required" });
 
   const { rows: orderRows } = await pool.query(
-    `SELECT ci.item_id, i.name, i.price
+    `SELECT ci.item_id, i.name, i.price, i.location
      FROM cart_items ci
      JOIN items i ON ci.item_id = i.id
      WHERE ci.id = $1 AND ci.email = $2 AND ci.status = 'ordered'`,
     [id, email]
   );
+
   if (!orderRows.length) return res.status(404).json({ error: "Order not found" });
 
   const { rows: userRows } = await pool.query(
