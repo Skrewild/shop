@@ -6,6 +6,7 @@ const app = express();
 const fileUpload = require('express-fileupload');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const ExcelJS = require('exceljs');
 
 app.use(cors({
   origin: '*',
@@ -53,7 +54,9 @@ app.post('/auth/login', async (req, res) => {
 });
 
 app.get('/products', async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name, price, location FROM items WHERE is_deleted = false');
+  const { rows } = await pool.query(
+    'SELECT id, name, price, location, stock FROM items WHERE is_deleted = false AND stock > 0'
+  );
   res.json(rows);
 });
 
@@ -94,8 +97,9 @@ app.delete('/cart/:id', async (req, res) => {
 
 app.post('/cart/confirm', async (req, res) => {
   const { item_id } = req.body;
+
   const { rows } = await pool.query(
-    `SELECT ci.email, i.name, i.price
+    `SELECT ci.email, i.name, i.price, i.stock
      FROM cart_items ci
      JOIN items i ON ci.item_id = i.id
      WHERE ci.id = $1`,
@@ -103,12 +107,23 @@ app.post('/cart/confirm', async (req, res) => {
   );
   if (!rows.length) return res.status(404).json({ error: "Item not found" });
 
-  const { email, name, price } = rows[0];
+  const { email, name, price, stock } = rows[0];
+
+  if (stock <= 0) {
+    return res.status(400).json({ error: "Товар закончился" });
+  }
+
   const { rows: users } = await pool.query(
     'SELECT name, contact, city, address FROM users WHERE email = $1',
     [email]
   );
   const user = users[0];
+
+  // ВАЖНО: уменьшить stock именно тут!
+  await pool.query(
+    'UPDATE items SET stock = stock - 1 WHERE name = $1 AND stock > 0',
+    [name]
+  );
 
   await pool.query(
     'UPDATE cart_items SET status = $1 WHERE id = $2',
@@ -126,6 +141,7 @@ app.post('/cart/confirm', async (req, res) => {
   res.json({ success: true });
 });
 
+
 app.post('/order/confirm', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -135,9 +151,9 @@ app.post('/order/confirm', async (req, res) => {
     [email]
   );
   const user = users[0];
-  
+
   const { rows: cartItems } = await pool.query(
-    `SELECT ci.item_id, i.price, i.name, i.location 
+    `SELECT ci.item_id, i.price, i.name, i.location, i.stock
      FROM cart_items ci 
      JOIN items i ON ci.item_id = i.id 
      WHERE ci.email = $1 AND ci.status = 'in_cart'`,
@@ -145,6 +161,12 @@ app.post('/order/confirm', async (req, res) => {
   );
 
   if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
+  
+  for (const item of cartItems) {
+    if (item.stock <= 0) {
+      return res.status(400).json({ error: `Товара "${item.name}" нет в наличии` });
+    }
+  }
 
   const orderRes = await pool.query(
     'INSERT INTO orders (email) VALUES ($1) RETURNING id', [email]
@@ -155,6 +177,11 @@ app.post('/order/confirm', async (req, res) => {
     await pool.query(
       'INSERT INTO order_items (order_id, item_id, price) VALUES ($1, $2, $3)',
       [orderId, item.item_id, item.price]
+    );
+    
+    await pool.query(
+      'UPDATE items SET stock = stock - 1 WHERE id = $1 AND stock > 0',
+      [item.item_id]
     );
   }
 
@@ -173,6 +200,7 @@ app.post('/order/confirm', async (req, res) => {
 
   res.json({ success: true, orderId });
 });
+
 
 app.get('/orders', async (req, res) => {
   const email = req.query.email;
@@ -229,16 +257,19 @@ app.post('/orders/cancel', async (req, res) => {
 });
 
 app.post('/products/add', async (req, res) => {
-  const { name, price, location } = req.body;
-  if (!name || !price || !location) {
+  const { name, price, location, stock } = req.body;
+  if (!name || !price || !location || stock === undefined) {
     return res.status(400).json({ error: "All fields required" });
   }
   if (isNaN(Number(price)) || Number(price) <= 0) {
     return res.status(400).json({ error: "Invalid price" });
   }
+  if (isNaN(Number(stock)) || Number(stock) < 0) {
+    return res.status(400).json({ error: "Invalid stock" });
+  }
   await pool.query(
-    'INSERT INTO items (name, price, location) VALUES ($1, $2, $3)',
-    [name, price, location]
+    'INSERT INTO items (name, price, location, stock) VALUES ($1, $2, $3, $4)',
+    [name, price, location, stock]
   );
   res.json({ success: true });
 });
@@ -309,6 +340,33 @@ app.post('/upload', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Upload failed", detail: err.message });
   }
+});
+
+app.get('/orders/export', async (req, res) => {
+  const email = req.query.email;
+  if (!email) return res.status(400).json({ error: "Email required" });
+
+  const { rows } = await pool.query(`
+    SELECT items.name, items.price, cart_items.created_at
+    FROM cart_items
+    JOIN items ON cart_items.item_id = items.id
+    WHERE cart_items.email = $1 AND cart_items.status = 'ordered'
+    ORDER BY cart_items.created_at DESC
+  `, [email]);
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Orders');
+  worksheet.columns = [
+    { header: 'Товар', key: 'name', width: 30 },
+    { header: 'Цена', key: 'price', width: 15 },
+    { header: 'Дата заказа', key: 'created_at', width: 25 }
+  ];
+
+  rows.forEach(row => worksheet.addRow(row));
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=orders.xlsx');
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 const PORT = process.env.PORT || 5000;
