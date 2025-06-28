@@ -38,29 +38,32 @@ bot.on('photo', async (msg) => {
 
   const parts = caption.split(';').map(s => s.trim());
 
-  if (parts.length === 2) {
-    const [name, priceRaw] = parts;
+  if (parts.length === 3) {
+    const [name, priceRaw, stockRaw] = parts;
     const price = parseFloat(priceRaw);
-    if (!name || isNaN(price)) {
-      return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат. Пример: Шапка; 990');
+    const stock = parseInt(stockRaw, 10);
+    if (!name || isNaN(price) || isNaN(stock)) {
+      return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат. Пример: Шапка; 990; 7');
     }
-    return handleAddOrEdit({ msg, isEdit: false, name, price });
+    return handleAddOrEdit({ msg, isEdit: false, name, price, stock });
+  }
+  
+  if (parts.length === 4) {
+    const [idRaw, name, priceRaw, stockRaw] = parts;
+    const id = parseInt(idRaw, 10);
+    const price = parseFloat(priceRaw);
+    const stock = parseInt(stockRaw, 10);
+    if (!id || !name || isNaN(price) || isNaN(stock)) {
+      return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат. Пример: 12; Шапка; 990; 7');
+    }
+    return handleAddOrEdit({ msg, isEdit: true, id, name, price, stock });
   }
 
-  if (parts.length === 3) {
-    const [idRaw, name, priceRaw] = parts;
-    const id = parseInt(idRaw);
-    const price = parseFloat(priceRaw);
-    if (!id || !name || isNaN(price)) {
-      return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат. Пример: 12; Шапка; 990');
-    }
-    return handleAddOrEdit({ msg, isEdit: true, id, name, price });
-  }
 
   return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат подписи.');
 });
 
-async function handleAddOrEdit({ msg, isEdit, id, name, price }) {
+async function handleAddOrEdit({ msg, isEdit, id, name, price, stock }) {
   const fileId = msg.photo[msg.photo.length - 1].file_id;
   const file = await bot.getFile(fileId);
   const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
@@ -88,7 +91,7 @@ async function handleAddOrEdit({ msg, isEdit, id, name, price }) {
 
     if (isEdit) {
       const updateRes = await axios.put(`${BACKEND_URL}/products/${id}`, {
-        name, price, location
+        name, price, location, stock // ← теперь отправляем stock
       }, {
         headers: { 'x-admin-secret': ADMIN_SECRET }
       });
@@ -99,7 +102,7 @@ async function handleAddOrEdit({ msg, isEdit, id, name, price }) {
         return bot.sendMessage(msg.chat.id, `⚠️ Ошибка обновления: ${updateRes.data.error}`);
       }
     } else {
-      const addRes = await axios.post(`${BACKEND_URL}/products/add`, { name, price, location });
+      const addRes = await axios.post(`${BACKEND_URL}/products/add`, { name, price, location, stock });
 
       if (addRes.data.success) {
         return bot.sendMessage(msg.chat.id, `✅ Товар "${name}" успешно добавлен с изображением!`);
@@ -114,6 +117,7 @@ async function handleAddOrEdit({ msg, isEdit, id, name, price }) {
     fs.unlink(filePath, () => {});
   }
 }
+
 
 bot.onText(/^\/start|\/help/, (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
