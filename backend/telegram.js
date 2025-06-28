@@ -79,11 +79,10 @@ bot.on('photo', async (msg) => {
   } catch (err) {
     bot.sendMessage(msg.chat.id, `❌ Ошибка загрузки: ${err.response?.data?.error || err.message}`);
   } finally {
-    fs.unlink(filePath, () => {}); // удалить временный файл
+    fs.unlink(filePath, () => {});
   }
 });
 
-// 💬 Команды (без изменений)
 bot.onText(/^\/start|\/help/, (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   bot.sendMessage(msg.chat.id, `
@@ -97,18 +96,20 @@ Available commands:
 📸 To add a product with photo, just send a product photo with caption:
 Name; Price
 
-Example: (photo) T-Shirt; 2990"
+Example:
+🖼️ (photo)
+📝 "T-Shirt; 2990"
   `.trim());
 });
 
 bot.onText(/^\/edit$/, async (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   try {
-    const res = await axios.get(${BACKEND_URL}/products);
+    const res = await axios.get(`${BACKEND_URL}/products`);
     if (!Array.isArray(res.data) || !res.data.length)
       return bot.sendMessage(msg.chat.id, '❗️ No products to edit.');
-    const text = res.data.map(p => ID: ${p.id}\nName: ${p.name}\nPrice: $${p.price}\nImage: ${p.location}\n---).join('\n');
-    bot.sendMessage(msg.chat.id, Products for editing:\n\n${text}\n\nNow send:\n/edit <ID>; <new name>; <new price>; <products/file.jpg>);
+    const text = res.data.map(p => `ID: ${p.id}\nName: ${p.name}\nPrice: $${p.price}\nImage: ${p.location}\n---`).join('\n');
+    bot.sendMessage(msg.chat.id, `Products for editing:\n\n${text}\n\nNow send:\n/edit <ID>; <new name>; <new price>; <products/file.jpg>`);
   } catch {
     bot.sendMessage(msg.chat.id, '❌ Could not fetch products.');
   }
@@ -121,27 +122,27 @@ bot.onText(/^\/edit (\d+);([^;]+);([^;]+);(.+)/, async (msg, match) => {
   const price = match[3].trim();
   const location = match[4].trim();
   try {
-    const res = await axios.put(${BACKEND_URL}/products/${id}, { name, price, location }, {
+    const res = await axios.put(`${BACKEND_URL}/products/${id}`, { name, price, location }, {
       headers: { 'x-admin-secret': ADMIN_SECRET }
     });
     if (res.data.success) {
-      bot.sendMessage(msg.chat.id, ✏️ Product ID ${id} updated!);
+      bot.sendMessage(msg.chat.id, `✏️ Product ID ${id} updated!`);
     } else {
-      bot.sendMessage(msg.chat.id, ⚠️ Error: ${res.data.error || 'Update failed.'});
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Update failed.'}`);
     }
   } catch (err) {
-    bot.sendMessage(msg.chat.id, ❌ Update error:\n${err.response?.data?.error || err.message});
+    bot.sendMessage(msg.chat.id, `❌ Update error:\n${err.response?.data?.error || err.message}`);
   }
 });
 
 bot.onText(/^\/delete$/, async (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   try {
-    const res = await axios.get(${BACKEND_URL}/products);
+    const res = await axios.get(`${BACKEND_URL}/products`);
     if (!Array.isArray(res.data) || !res.data.length)
       return bot.sendMessage(msg.chat.id, '❗️ No products to delete.');
-    const text = res.data.map(p => ID: ${p.id}\nName: ${p.name}\nPrice: $${p.price}\nImage: ${p.location}\n---).join('\n');
-    bot.sendMessage(msg.chat.id, Products for deletion:\n\n${text}\n\nNow send:\n/delete <ID>);
+    const text = res.data.map(p => `ID: ${p.id}\nName: ${p.name}\nPrice: $${p.price}\nImage: ${p.location}\n---`).join('\n');
+    bot.sendMessage(msg.chat.id, `Products for deletion:\n\n${text}\n\nNow send:\n/delete <ID>`);
   } catch {
     bot.sendMessage(msg.chat.id, '❌ Could not fetch products.');
   }
@@ -151,35 +152,35 @@ bot.onText(/^\/delete (\d+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   const id = match[1].trim();
   try {
-    const res = await axios.delete(${BACKEND_URL}/products/${id}, {
+    const res = await axios.delete(`${BACKEND_URL}/products/${id}`, {
       headers: { 'x-admin-secret': ADMIN_SECRET }
     });
     if (res.data.success) {
-      bot.sendMessage(msg.chat.id, 🗑️ Product ID ${id} deleted!);
+      bot.sendMessage(msg.chat.id, `🗑️ Product ID ${id} deleted!`);
     } else {
-      bot.sendMessage(msg.chat.id, ⚠️ Error: ${res.data.error || 'Delete failed.'});
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Delete failed.'}`);
     }
   } catch (err) {
-    bot.sendMessage(msg.chat.id, ❌ Delete error:\n${err.response?.data?.error || err.message});
+    bot.sendMessage(msg.chat.id, `❌ Delete error:\n${err.response?.data?.error || err.message}`);
   }
 });
 
 bot.onText(/^\/orders$/, async (msg) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   try {
-    const res = await axios.get(${BACKEND_URL}/admin/orders, {
+    const res = await axios.get(`${BACKEND_URL}/admin/orders`, {
       headers: { 'x-admin-secret': ADMIN_SECRET }
     });
     if (!Array.isArray(res.data) || !res.data.length)
       return bot.sendMessage(msg.chat.id, 'No confirmed orders.');
     const text = res.data.map(o =>
-      Order ID: ${o.id}\n +
-      User: ${o.name}\nEmail: ${o.email}\nContact: ${o.contact}\nCity: ${o.city}\nAddress: ${o.address}\n +
-      Product: ${o.item_name}\nPrice: $${o.price}\nTime: ${o.created_at?.slice(0,19).replace('T', ' ')}\n---
+      `Order ID: ${o.id}\n` +
+      `User: ${o.name}\nEmail: ${o.email}\nContact: ${o.contact}\nCity: ${o.city}\nAddress: ${o.address}\n` +
+      `Product: ${o.product_name}\nPrice: $${o.price}\nTime: ${o.created_at?.slice(0,19).replace('T', ' ')}\n---`
     ).join('\n');
-    bot.sendMessage(msg.chat.id, Confirmed Orders:\n\n${text}\nTo delete: /deleteorder <ID>);
+    bot.sendMessage(msg.chat.id, `Confirmed Orders:\n\n${text}\nTo delete: /deleteorder <ID>`);
   } catch (err) {
-    bot.sendMessage(msg.chat.id, ❌ Could not fetch orders: ${err.response?.data?.error || err.message});
+    bot.sendMessage(msg.chat.id, `❌ Could not fetch orders: ${err.response?.data?.error || err.message}`);
   }
 });
 
@@ -187,18 +188,17 @@ bot.onText(/^\/deleteorder (\d+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) return;
   const id = match[1].trim();
   try {
-    const res = await axios.delete(${BACKEND_URL}/admin/orders/${id}, {
+    const res = await axios.delete(`${BACKEND_URL}/admin/orders/${id}`, {
       headers: { 'x-admin-secret': ADMIN_SECRET }
     });
     if (res.data.success) {
-      bot.sendMessage(msg.chat.id, 🗑️ Order ID ${id} deleted!);
+      bot.sendMessage(msg.chat.id, `🗑️ Order ID ${id} deleted!`);
     } else {
-      bot.sendMessage(msg.chat.id, ⚠️ Error: ${res.data.error || 'Delete failed.'});
+      bot.sendMessage(msg.chat.id, `⚠️ Error: ${res.data.error || 'Delete failed.'}`);
     }
   } catch (err) {
-    bot.sendMessage(msg.chat.id, ❌ Delete error:\n${err.response?.data?.error || err.message});
+    bot.sendMessage(msg.chat.id, `❌ Delete error:\n${err.response?.data?.error || err.message}`);
   }
 });
 
-module.exports = { notifyAdminOrder };
 module.exports = { notifyAdminOrder };
