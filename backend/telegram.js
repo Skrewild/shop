@@ -12,7 +12,6 @@ const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const BACKEND_URL = process.env.BACKEND_URL || 'https://shop-kw6q.onrender.com';
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
-// Уведомление о заказе
 async function notifyAdminOrder({ email, user = {}, items, total, orderId, cancelled = false }) {
   const info = `
 ${cancelled ? '❌ ORDER CANCELLED!' : '🛒 New order!'} ${orderId ? `№${orderId}` : ""}
