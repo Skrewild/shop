@@ -53,7 +53,7 @@ app.post('/auth/login', async (req, res) => {
 });
 
 app.get('/products', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM items');
+  const { rows } = await pool.query('SELECT id, name, price, location FROM items');
   res.json(rows);
 });
 
@@ -303,7 +303,6 @@ app.post('/upload', async (req, res) => {
     res.status(500).json({ error: "Upload failed", detail: err.message });
   }
 });
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
