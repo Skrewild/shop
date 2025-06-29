@@ -207,13 +207,15 @@ app.get('/orders', async (req, res) => {
     `SELECT items.name, items.price, cart_items.id, cart_items.status, cart_items.created_at
      FROM cart_items 
      JOIN items ON cart_items.item_id = items.id 
-     WHERE cart_items.email = $1 AND cart_items.status = 'ordered'
+     WHERE cart_items.email = $1 
+       AND cart_items.status IN ('waiting', 'ordered')
      ORDER BY cart_items.created_at DESC`,
     [email]
   );
 
   res.json(rows);
 });
+
 
 
 app.post('/orders/cancel', async (req, res) => {
