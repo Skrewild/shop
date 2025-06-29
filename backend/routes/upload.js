@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { uploadFile } = require('../controllers/uploadController');
+const { uploadImage } = require('../controllers/uploadController');
 
 router.post('/', uploadImage);
 
