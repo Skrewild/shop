@@ -21,17 +21,18 @@ export default function Cart({ email }) {
       });
   }, [email]);
 
-  const confirmOrderItem = async (id) => {
-    try {
-      await api.post("/cart/confirm", { item_id: id });
-      setCart((cart) => cart.filter((item) => item.id !== id));
-      setPopup("Order confirmed!");
-      setTimeout(() => setPopup(""), 1500);
-    } catch {
-      setPopup("Failed to confirm order.");
-      setTimeout(() => setPopup(""), 1500);
-    }
-  };
+const confirmOrderItem = async (id) => {
+  try {
+    await api.post("/orders/confirm", { item_id: id });
+    setCart((cart) => cart.filter((item) => item.id !== id));
+    setPopup("Order confirmed!");
+    setTimeout(() => setPopup(""), 1500);
+  } catch {
+    setPopup("Failed to confirm order.");
+    setTimeout(() => setPopup(""), 1500);
+  }
+};
+
 
   const removeCartItem = async (id) => {
     try {
