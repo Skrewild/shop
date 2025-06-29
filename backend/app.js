@@ -110,7 +110,7 @@ app.post('/cart/confirm', async (req, res) => {
   const { email, name, price, stock } = rows[0];
 
   if (stock <= 0) {
-    return res.status(400).json({ error: "Товар закончился" });
+    return res.status(400).json({ error: "Run out of this product" });
   }
 
   const { rows: users } = await pool.query(
@@ -119,7 +119,6 @@ app.post('/cart/confirm', async (req, res) => {
   );
   const user = users[0];
 
-  // Меняем статус этой позиции на "waiting"
   await pool.query(
     'UPDATE cart_items SET status = $1 WHERE id = $2',
     ["waiting", item_id]
