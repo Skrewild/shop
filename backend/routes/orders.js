@@ -1,14 +1,9 @@
 const router = require('express').Router();
-const {
-  confirmSingleCart,
-  confirmOrder,
-  getOrders,
-  cancelOrder
-} = require('../controllers/orderController');
+const { confirmOrder, getOrders, cancelOrder, exportOrders } = require('../controllers/orderController');
 
-router.post('/cart/confirm', confirmSingleCart);
-router.post('/confirm', confirmOrder);           
-router.get('/', getOrders);                   
-router.post('/cancel', cancelOrder);        
+router.post('/confirm', confirmOrder);
+router.get('/', getOrders);
+router.post('/cancel', cancelOrder);
+router.get('/export', exportOrders);
 
 module.exports = router;
