@@ -221,14 +221,14 @@ app.post('/orders/cancel', async (req, res) => {
   if (!id || !email) return res.status(400).json({ error: "ID and email required" });
 
   const { rows: orderRows } = await pool.query(
-    `SELECT ci.item_id, i.name, i.price, i.location
+    `SELECT ci.item_id, i.name, i.price, i.location, ci.status
      FROM cart_items ci
      JOIN items i ON ci.item_id = i.id
-     WHERE ci.id = $1 AND ci.email = $2 AND ci.status = 'ordered'`,
+     WHERE ci.id = $1 AND ci.email = $2 AND ci.status = 'waiting'`,
     [id, email]
   );
 
-  if (!orderRows.length) return res.status(404).json({ error: "Order not found" });
+  if (!orderRows.length) return res.status(404).json({ error: "Order not found or already processed" });
 
   const { rows: userRows } = await pool.query(
     'SELECT name, contact, city, address FROM users WHERE email = $1',
@@ -252,6 +252,7 @@ app.post('/orders/cancel', async (req, res) => {
 
   res.json({ success: true });
 });
+
 
 app.post('/products/add', async (req, res) => {
   const { name, price, location, stock } = req.body;
