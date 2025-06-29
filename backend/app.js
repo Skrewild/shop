@@ -160,8 +160,14 @@ app.post('/order/confirm', async (req, res) => {
   if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
 
   for (const item of cartItems) {
-    if (item.stock < item.quantity) {
-      return res.status(400).json({ error: `Not enough stock for "${item.name}". Requested: ${item.quantity}, in stock: ${item.stock}` });
+    const { rows: reservedRows } = await pool.query(
+      `SELECT COUNT(*) FROM cart_items WHERE item_id = $1 AND status = 'waiting'`,
+      [item.item_id]
+    );
+    const reserved = Number(reservedRows[0].count);
+
+    if (item.stock - reserved < item.quantity) {
+      return res.status(400).json({ error: `Not enough stock for "${item.name}". Requested: ${item.quantity}, available: ${item.stock - reserved}` });
     }
   }
 
@@ -169,7 +175,7 @@ app.post('/order/confirm', async (req, res) => {
     'INSERT INTO orders (email) VALUES ($1) RETURNING id', [email]
   );
   const orderId = orderRes.rows[0].id;
-  
+
   for (const item of cartItems) {
     await pool.query(
       'INSERT INTO order_items (order_id, item_id, price, quantity) VALUES ($1, $2, $3, $4)',
@@ -178,10 +184,9 @@ app.post('/order/confirm', async (req, res) => {
   }
 
   await pool.query(
-  'UPDATE cart_items SET status = $1 WHERE email = $2 AND status = $3',
-  ["waiting", email, "in_cart"]
+    'UPDATE cart_items SET status = $1 WHERE email = $2 AND status = $3',
+    ["waiting", email, "in_cart"]
   );
-
 
   await notifyAdminOrder({
     email,
@@ -193,7 +198,6 @@ app.post('/order/confirm', async (req, res) => {
 
   res.json({ success: true, orderId });
 });
-
 
 app.get('/orders', async (req, res) => {
   const email = req.query.email;
