@@ -33,6 +33,18 @@ export default function Cart({ email }) {
     }
   };
 
+  const removeCartItem = async (id) => {
+    try {
+      await api.delete(`/cart/${id}`);
+      setCart((cart) => cart.filter((item) => item.id !== id));
+      setPopup("Item removed from cart.");
+      setTimeout(() => setPopup(""), 1500);
+    } catch {
+      setPopup("Failed to remove item.");
+      setTimeout(() => setPopup(""), 1500);
+    }
+  };
+
   const confirmAllOrder = async () => {
     try {
       await api.post("/order/confirm", { email });
@@ -66,6 +78,13 @@ export default function Cart({ email }) {
             <div className="cart-item-actions">
               <button className="cart-btn" onClick={() => confirmOrderItem(item.id)}>
                 Confirm Order
+              </button>
+              <button
+                className="cart-btn"
+                style={{ background: "#f44336", marginLeft: 8 }}
+                onClick={() => removeCartItem(item.id)}
+              >
+                Remove
               </button>
             </div>
           </div>
