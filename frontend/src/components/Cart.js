@@ -45,18 +45,6 @@ export default function Cart({ email }) {
     }
   };
 
-  const confirmAllOrder = async () => {
-    try {
-      await api.post("/order/confirm", { email });
-      setCart([]);
-      setPopup("All items ordered! Thank you!");
-      setTimeout(() => setPopup(""), 2000);
-    } catch {
-      setPopup("Failed to place order.");
-      setTimeout(() => setPopup(""), 2000);
-    }
-  };
-
   if (loading) return <div className="empty-state">Loading...</div>;
   if (!cart.length) return <div className="empty-state">Your cart is empty.</div>;
 
