@@ -78,11 +78,6 @@ export default function Cart({ email }) {
           </div>
         ))}
       </div>
-      <div style={{ textAlign: "center", marginTop: 24 }}>
-        <button className="cart-btn" style={{ background: "#4caf50", fontSize: 18 }} onClick={confirmAllOrder}>
-          Place Order for All
-        </button>
-      </div>
     </div>
   );
 }
