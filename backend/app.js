@@ -355,9 +355,9 @@ app.get('/orders/export', async (req, res) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Orders');
   worksheet.columns = [
-    { header: 'Товар', key: 'name', width: 30 },
-    { header: 'Цена', key: 'price', width: 15 },
-    { header: 'Дата заказа', key: 'created_at', width: 25 }
+    { header: 'Product', key: 'name', width: 30 },
+    { header: 'Price', key: 'price', width: 15 },
+    { header: 'Date', key: 'created_at', width: 25 }
   ];
 
   rows.forEach(row => worksheet.addRow(row));
