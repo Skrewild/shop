@@ -1,12 +1,14 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
-const app = express();
 const fileUpload = require('express-fileupload');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const ExcelJS = require('exceljs');
+
+const app = express();
+const pool = require('./models/db');
+const { notifyAdminOrder } = require('./telegram');
 
 app.use(cors({
   origin: '*',
@@ -14,246 +16,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.options('*', cors());
-
 app.use(express.json());
 app.use(fileUpload());
 app.use('/products', express.static(path.join(__dirname, 'products')));
 
-const pool = require('./models/db');
-const { notifyAdminOrder } = require('./telegram');
-
-app.post('/auth/register', async (req, res) => {
-  const { name, email, password, contact, city, address } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "All fields required" });
-  }
-  const { rows: users } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-  if (users.length > 0) {
-    return res.status(400).json({ error: "Email already exists" });
-  }
-  const hash = await bcrypt.hash(password, 10);
-  await pool.query(
-    'INSERT INTO users (name, email, password, contact, city, address) VALUES ($1, $2, $3, $4, $5, $6)',
-    [name, email, hash, contact, city, address]
-  );
-  res.json({ success: true, email, name });
-});
-
-app.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  const { rows: users } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-  if (users.length === 0) {
-    return res.status(401).json({ error: "User not found" });
-  }
-  const user = users[0];
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) {
-    return res.status(401).json({ error: "Wrong password" });
-  }
-  res.json({ token: "dev-token", email: user.email, name: user.name });
-});
-
-app.get('/products', async (req, res) => {
-  const { rows } = await pool.query(
-    'SELECT id, name, price, location, stock FROM items WHERE is_deleted = false AND stock > 0'
-  );
-  res.json(rows);
-});
-
-app.get('/cart', async (req, res) => {
-  const email = req.query.email;
-  if (!email) return res.status(400).json({ error: "Email required" });
-
-  const { rows } = await pool.query(
-    `SELECT cart_items.id, items.name, items.price
-     FROM cart_items 
-     JOIN items ON cart_items.item_id = items.id 
-     WHERE cart_items.email = $1 AND cart_items.status = 'in_cart'`,
-    [email]
-  );
-
-  res.json(rows);
-});
-
-
-
-app.post('/cart', async (req, res) => {
-  const { item_id, email } = req.body;
-  if (!item_id || !email) return res.status(400).json({ error: "item_id and email required" });
-  const { rows: users } = await pool.query('SELECT 1 FROM users WHERE email = $1', [email]);
-  if (users.length === 0) return res.status(403).json({ error: "User not found" });
-  await pool.query(
-    'INSERT INTO cart_items (email, item_id, status) VALUES ($1, $2, $3)',
-    [email, item_id, "in_cart"]
-  );
-  res.json({ success: true });
-});
-
-app.delete('/cart/:id', async (req, res) => {
-  const id = req.params.id;
-  await pool.query('DELETE FROM cart_items WHERE id = $1', [id]);
-  res.json({ success: true });
-});
-
-app.post('/cart/confirm', async (req, res) => {
-  const { item_id } = req.body;
-
-  const { rows } = await pool.query(
-    `SELECT ci.email, i.name, i.price, i.stock
-     FROM cart_items ci
-     JOIN items i ON ci.item_id = i.id
-     WHERE ci.id = $1`,
-    [item_id]
-  );
-  if (!rows.length) return res.status(404).json({ error: "Item not found" });
-
-  const { email, name, price, stock } = rows[0];
-
-  if (stock <= 0) {
-    return res.status(400).json({ error: "Run out of this product" });
-  }
-
-  const { rows: users } = await pool.query(
-    'SELECT name, contact, city, address FROM users WHERE email = $1',
-    [email]
-  );
-  const user = users[0];
-
-  await pool.query(
-    'UPDATE cart_items SET status = $1 WHERE id = $2',
-    ["waiting", item_id]
-  );
-
-  await notifyAdminOrder({
-    email,
-    user,
-    items: [{ name, price }],
-    total: Number(price),
-    orderId: `single-item-${item_id}`
-  });
-
-  res.json({ success: true });
-});
-
-
-
-app.post('/order/confirm', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Email required" });
-
-  const { rows: users } = await pool.query(
-    'SELECT name, contact, city, address FROM users WHERE email = $1',
-    [email]
-  );
-  const user = users[0];
-
-  const { rows: cartItems } = await pool.query(
-    `SELECT ci.item_id, i.price, i.name, i.location, i.stock, COUNT(*) AS quantity
-     FROM cart_items ci
-     JOIN items i ON ci.item_id = i.id
-     WHERE ci.email = $1 AND ci.status = 'in_cart'
-     GROUP BY ci.item_id, i.price, i.name, i.location, i.stock`,
-    [email]
-  );
-
-  if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
-
-  for (const item of cartItems) {
-    const { rows: reservedRows } = await pool.query(
-      `SELECT COUNT(*) FROM cart_items WHERE item_id = $1 AND status = 'waiting'`,
-      [item.item_id]
-    );
-    const reserved = Number(reservedRows[0].count);
-
-    if (item.stock - reserved < item.quantity) {
-      return res.status(400).json({ error: `Not enough stock for "${item.name}". Requested: ${item.quantity}, available: ${item.stock - reserved}` });
-    }
-  }
-
-  const orderRes = await pool.query(
-    'INSERT INTO orders (email) VALUES ($1) RETURNING id', [email]
-  );
-  const orderId = orderRes.rows[0].id;
-
-  for (const item of cartItems) {
-    await pool.query(
-      'INSERT INTO order_items (order_id, item_id, price, quantity) VALUES ($1, $2, $3, $4)',
-      [orderId, item.item_id, item.price, item.quantity]
-    );
-  }
-
-  await pool.query(
-    'UPDATE cart_items SET status = $1 WHERE email = $2 AND status = $3',
-    ["waiting", email, "in_cart"]
-  );
-
-  await notifyAdminOrder({
-    email,
-    user,
-    items: cartItems,
-    total: cartItems.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0),
-    orderId
-  });
-
-  res.json({ success: true, orderId });
-});
-
-app.get('/orders', async (req, res) => {
-  const email = req.query.email;
-  if (!email) return res.status(400).json({ error: "Email required" });
-
-  const { rows } = await pool.query(
-    `SELECT items.name, items.price, cart_items.id, cart_items.status, cart_items.created_at
-     FROM cart_items 
-     JOIN items ON cart_items.item_id = items.id 
-     WHERE cart_items.email = $1 
-       AND cart_items.status IN ('waiting', 'ordered')
-     ORDER BY cart_items.created_at DESC`,
-    [email]
-  );
-
-  res.json(rows);
-});
-
-
-
-app.post('/orders/cancel', async (req, res) => {
-  const { id, email } = req.body;
-  if (!id || !email) return res.status(400).json({ error: "ID and email required" });
-
-  const { rows: orderRows } = await pool.query(
-    `SELECT ci.item_id, i.name, i.price, i.location, ci.status
-     FROM cart_items ci
-     JOIN items i ON ci.item_id = i.id
-     WHERE ci.id = $1 AND ci.email = $2 AND ci.status = 'waiting'`,
-    [id, email]
-  );
-
-  if (!orderRows.length) return res.status(404).json({ error: "Order not found or already processed" });
-
-  const { rows: userRows } = await pool.query(
-    'SELECT name, contact, city, address FROM users WHERE email = $1',
-    [email]
-  );
-  const user = userRows[0];
-
-  await pool.query(
-    'UPDATE cart_items SET status = $1 WHERE id = $2 AND email = $3',
-    ["cancelled", id, email]
-  );
-
-  await notifyAdminOrder({
-    email,
-    user,
-    items: orderRows,
-    total: orderRows.reduce((sum, item) => sum + Number(item.price), 0),
-    orderId: id,
-    cancelled: true
-  });
-
-  res.json({ success: true });
-});
-
+app.use('/auth', require('./routes/auth'));
+app.use('/cart', require('./routes/cart'));
+app.use('/orders', require('./routes/orders'));
+app.use('/upload', require('./routes/upload'));
+app.use('/products', require('./routes/products'));
 
 app.post('/products/add', async (req, res) => {
   const { name, price, location, stock } = req.body;
@@ -323,51 +94,6 @@ app.delete('/admin/orders/:id', async (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/upload', async (req, res) => {
-  if (!req.files || !req.files.image) {
-    return res.status(400).json({ error: "No image file provided" });
-  }
-
-  const image = req.files.image;
-  const ext = path.extname(image.name);
-  const filename = uuidv4() + ext;
-  const filepath = path.join(__dirname, 'products', filename);
-
-  try {
-    await image.mv(filepath);
-    res.json({ success: true, location: `products/${filename}` });
-  } catch (err) {
-    res.status(500).json({ error: "Upload failed", detail: err.message });
-  }
-});
-
-app.get('/orders/export', async (req, res) => {
-  const email = req.query.email;
-  if (!email) return res.status(400).json({ error: "Email required" });
-
-  const { rows } = await pool.query(`
-    SELECT items.name, items.price, cart_items.created_at
-    FROM cart_items
-    JOIN items ON cart_items.item_id = items.id
-    WHERE cart_items.email = $1 AND cart_items.status = 'ordered'
-    ORDER BY cart_items.created_at DESC
-  `, [email]);
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Orders');
-  worksheet.columns = [
-    { header: 'Product', key: 'name', width: 30 },
-    { header: 'Price', key: 'price', width: 15 },
-    { header: 'Date', key: 'created_at', width: 25 }
-  ];
-
-  rows.forEach(row => worksheet.addRow(row));
-
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename=orders.xlsx');
-  await workbook.xlsx.write(res);
-  res.end();
-});
-
 app.get('/admin/orders/waiting', async (req, res) => {
   if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "Not authorized" });
@@ -389,7 +115,6 @@ app.post('/admin/orders/confirm/:id', async (req, res) => {
     return res.status(403).json({ error: "Not authorized" });
   }
   const id = req.params.id;
-
   const { rows } = await pool.query(
     `SELECT ci.item_id, i.stock
      FROM cart_items ci
@@ -405,12 +130,10 @@ app.post('/admin/orders/confirm/:id', async (req, res) => {
   }
 
   await pool.query('UPDATE items SET stock = stock - 1 WHERE id = $1', [item_id]);
-
   await pool.query('UPDATE cart_items SET status = $1 WHERE id = $2', ["ordered", id]);
 
   res.json({ success: true });
 });
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('API listening on ' + PORT));
