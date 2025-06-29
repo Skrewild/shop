@@ -33,7 +33,7 @@ bot.on('photo', async (msg) => {
 
   const caption = msg.caption;
   if (!caption || !caption.includes(';')) {
-    return bot.sendMessage(msg.chat.id, '⚠️ Подпись должна быть:\nДля добавления: Название; Цена\nДля редактирования: ID; Название; Цена');
+    return bot.sendMessage(msg.chat.id, '⚠️ For addtion:\nTo add: Name; Price\nFor edit: ID; Name; Price');
   }
 
   const parts = caption.split(';').map(s => s.trim());
@@ -43,7 +43,7 @@ bot.on('photo', async (msg) => {
     const price = parseFloat(priceRaw);
     const stock = parseInt(stockRaw, 10);
     if (!name || isNaN(price) || isNaN(stock)) {
-      return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат. Пример: Шапка; 990; 7');
+      return bot.sendMessage(msg.chat.id, '⚠️ Incorrect format. Example: hat; 990; 7');
     }
     return handleAddOrEdit({ msg, isEdit: false, name, price, stock });
   }
@@ -54,13 +54,13 @@ bot.on('photo', async (msg) => {
     const price = parseFloat(priceRaw);
     const stock = parseInt(stockRaw, 10);
     if (!id || !name || isNaN(price) || isNaN(stock)) {
-      return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат. Пример: 12; Шапка; 990; 7');
+      return bot.sendMessage(msg.chat.id, '⚠️ ⚠️ Incorrect format. Example: 2, hat; 990; 7');
     }
     return handleAddOrEdit({ msg, isEdit: true, id, name, price, stock });
   }
 
 
-  return bot.sendMessage(msg.chat.id, '⚠️ Неверный формат подписи.');
+  return bot.sendMessage(msg.chat.id, '⚠️ incorrect format.');
 });
 
 async function handleAddOrEdit({ msg, isEdit, id, name, price, stock }) {
@@ -91,7 +91,7 @@ async function handleAddOrEdit({ msg, isEdit, id, name, price, stock }) {
 
     if (isEdit) {
       const updateRes = await axios.put(`${BACKEND_URL}/products/${id}`, {
-        name, price, location, stock // ← теперь отправляем stock
+        name, price, location, stock 
       }, {
         headers: { 'x-admin-secret': ADMIN_SECRET }
       });
@@ -99,20 +99,20 @@ async function handleAddOrEdit({ msg, isEdit, id, name, price, stock }) {
       if (updateRes.data.success) {
         return bot.sendMessage(msg.chat.id, `✏️ Товар ID ${id} успешно обновлён!`);
       } else {
-        return bot.sendMessage(msg.chat.id, `⚠️ Ошибка обновления: ${updateRes.data.error}`);
+        return bot.sendMessage(msg.chat.id, `⚠️ Update error: ${updateRes.data.error}`);
       }
     } else {
       const addRes = await axios.post(`${BACKEND_URL}/products/add`, { name, price, location, stock });
 
       if (addRes.data.success) {
-        return bot.sendMessage(msg.chat.id, `✅ Товар "${name}" успешно добавлен с изображением!`);
+        return bot.sendMessage(msg.chat.id, `✅ Product "${name}" have been successfully added!`);
       } else {
-        return bot.sendMessage(msg.chat.id, `⚠️ Ошибка при добавлении товара: ${addRes.data.error}`);
+        return bot.sendMessage(msg.chat.id, `⚠️ Error: ${addRes.data.error}`);
       }
     }
 
   } catch (err) {
-    return bot.sendMessage(msg.chat.id, `❌ Ошибка загрузки: ${err.response?.data?.error || err.message}`);
+    return bot.sendMessage(msg.chat.id, `❌ Upload error: ${err.response?.data?.error || err.message}`);
   } finally {
     fs.unlink(filePath, () => {});
   }
