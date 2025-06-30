@@ -97,7 +97,7 @@ async function handleAddOrEdit({ msg, isEdit, id, name, price, stock }) {
       });
 
       if (updateRes.data.success) {
-        return bot.sendMessage(msg.chat.id, `✏️ Товар ID ${id} успешно обновлён!`);
+        return bot.sendMessage(msg.chat.id, `✏️ Product ID ${id} been successfuly updated!`);
       } else {
         return bot.sendMessage(msg.chat.id, `⚠️ Update error: ${updateRes.data.error}`);
       }
